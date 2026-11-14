@@ -1,0 +1,70 @@
+# API
+
+Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.json`. No service key. Upload returns a random session token; subsequent calls must send `X-Session: <token>`. Treat it as a bearer secret. Never place it in a URL or logs. Responses are `Cache-Control: no-store`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Engine health, installed OCR languages, upload/page limits |
+| POST | `/documents` | Multipart `file` PDF, optional `password`; returns token and document info |
+| POST | `/images-to-pdf` | Multipart repeated `files`; returns a new document token |
+| GET | `/document` | Page dimensions/rotation, metadata, bytes, undo/redo availability |
+| GET | `/document/pdf` | Current actual PDF bytes |
+| GET | `/document/page/{zero-based-page}/text` | Rendered spans with bounding boxes and `editable` flags / reasons |
+| GET | `/document/page/{page}/thumbnail` | PNG thumbnail |
+| POST | `/document/operation` | JSON `{ "operation": "...", "args": {...} }`; commits an actual PDF version |
+| POST | `/document/file-operation` | Multipart `operation`, `args` JSON, and `file`; merge/insert/image |
+| POST | `/document/history/undo` | Restore earlier PDF bytes |
+| POST | `/document/history/redo` | Restore later PDF bytes |
+| POST | `/document/export` | JSON `{ "kind": "pdf", "args": {} }`; downloadable binary/text response |
+| GET | `/document/search?q=...` | Matching pages and rectangles |
+| DELETE | `/document` | Remove session/history from memory |
+
+Every page index is **zero-based**. Coordinates are PDF points (72 pt = one inch) measured from the rendered page's top-left. New content generally requires rotation 0°. Each operation is atomic: failures preserve the preceding PDF version. Up to 12 versions are retained. Document info responses include `undo` and `redo` flags.
+
+## JSON operations
+
+| Operation | Args |
+|---|---|
+| `replace` | `page`, text run `id` from the latest text endpoint, `text`, optional `size`, `color` |
+| `find-replace` | `find`, `replacement`; supported spans only across all pages |
+| `text`, `stamp` | `page`, `text`, `x`, `y` (baseline), `size` 4–144, `color` hex, `font` (`helv`, `tiro`, `cour`, `hebo`) |
+| `pages` | `indices`: desired page order; repeat indices to duplicate, omit to delete |
+| `rotate` | `page`, `angle` (default 90) |
+| `rectangle`, `line`, `highlight`, `redact`, `crop` | `page`, `rect: [x0,y0,x1,y1]`; optional `color` for non-redaction tools |
+| `comment` | `page`, `x`, `y`, `text` |
+| `numbers` | optional `color`; every page |
+| `watermark` | `text`, `size`, `color`; every page |
+| `metadata` | `metadata: {title,author,subject,keywords,creator,producer}` |
+| `compress` | none; rewrite with garbage collection and deflated streams |
+| `ocr` | `languages: "eng"`, or installed Tesseract codes joined by `+` |
+
+Text run IDs depend on current content-stream instruction offsets. Fetch them again after every operation/undo/redo. Replacement glyphs must exist in the font. Repeated/ambiguous spans are read-only. No overlay fallback is performed.
+
+File operations: `merge` appends all pages; `insert` accepts `at` (0-based insertion position); both accept known `password` if the attached PDF requires it. `image` accepts `page` and `rect` and re-encodes supported PNG/JPEG/WebP images into PNG before embedding. Original image proportion is retained.
+
+## Exports
+
+- `pdf`: current bytes, all pages.
+- `text`: UTF-8 plain text.
+- `images`: ZIP of rendered PNG pages, maximum 50 selected pages.
+- `extract-images`: ZIP of unique embedded raster images. Vector illustrations and inline-image extraction are not supported.
+- `split`: ZIP with one PDF per selected page.
+- `extract`: one PDF containing selected pages in the requested order.
+- `protect`: AES-256 PDF; `args.password` must have at least six characters. This encrypts the **downloaded copy**, not the in-memory working session.
+
+For selected-page exports, supply `args.indices`. It defaults to all pages. An unsupported export kind returns 422.
+
+## Example
+
+```bash
+curl -F file=@document.pdf http://127.0.0.1:8000/api/documents
+# Use the returned token without committing it to source control.
+curl -H 'X-Session: TOKEN' http://127.0.0.1:8000/api/document/page/0/text
+curl -H 'X-Session: TOKEN' -H 'Content-Type: application/json' \
+  -d '{"operation":"replace","args":{"page":0,"id":4,"text":"Updated contract"}}' \
+  http://127.0.0.1:8000/api/document/operation
+curl -H 'X-Session: TOKEN' -H 'Content-Type: application/json' \
+  -d '{"kind":"pdf"}' http://127.0.0.1:8000/api/document/export -o edited.pdf
+```
+
+Error JSON uses `detail`. Common codes: 422 invalid/unsupported operation or file/password; 404 expired/missing session; 413 oversized upload; 403 cross-origin write; 503 exhausted global memory. Request model errors use FastAPI's standard detail array. No permissive cross-origin API access is enabled. The local app does not authenticate users beyond possession of a session token.

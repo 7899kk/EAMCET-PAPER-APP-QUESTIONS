@@ -1,0 +1,12 @@
+.git
+.venv
+**/node_modules
+**/__pycache__
+.pytest_cache
+frontend/dist
+frontend/public/pdfjs
+.env
+.env.*
+*.log
+source.zip
+tests/artifacts

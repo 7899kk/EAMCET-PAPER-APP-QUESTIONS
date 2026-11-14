@@ -1,0 +1,8 @@
+{
+  "name": "folio-pdf-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": ".venv/bin/python preview.py"
+  }
+}

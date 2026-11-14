@@ -1,0 +1,4 @@
+Folio PDF editor — original application source offered under AGPL-3.0-or-later.
+Third-party code, fonts, and notices retain their respective licences.
+See docs/LICENSES.md, THIRD_PARTY/, research/*-licenses.json, and frontend/package-lock.json.
+No Stirling PDF code or engine binary is included. research/ contains licence-review evidence.

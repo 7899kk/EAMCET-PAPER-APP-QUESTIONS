@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/public/pdfjs/
+*.log
+.env
+
+.env.*
+source.zip
+tests/artifacts/*.pdf

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: folio-pdf-editor
+    runtime: docker
+    plan: free
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: '10000'
+      - key: FOLIO_PREVIEW_PASSWORD
+        generateValue: true
