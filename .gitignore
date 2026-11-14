@@ -10,3 +10,5 @@ frontend/public/pdfjs/
 .env.*
 source.zip
 tests/artifacts/*.pdf
+
+tests/artifacts/browser/

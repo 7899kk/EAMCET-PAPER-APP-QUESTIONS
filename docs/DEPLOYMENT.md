@@ -44,3 +44,7 @@ docker run --rm -p 10000:10000 folio-pdf
 ```
 
 Open `http://localhost:10000`. To enable password protection locally, pass a secret via your environment using Docker's `-e FOLIO_PREVIEW_PASSWORD` option. The image runs as an unprivileged user and writes only transient OCR data under `/tmp`.
+
+### Browser login compatibility
+
+The hosted password gate now sets a signed one-hour browser cookie after successful login. It is HTTP-only, SameSite=Strict, and Secure on HTTPS. It is invalid after changing the preview password. Basic authentication remains supported for API clients. API URLs are resolved against the clean origin, so opening a URL containing login credentials does not prevent PDF upload. The configured Render password is unchanged by this fix.

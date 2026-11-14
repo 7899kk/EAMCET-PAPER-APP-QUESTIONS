@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT_FILES = {'Dockerfile', '.dockerignore', '.gitignore', 'render.yaml', 'serve.py',
               'start.sh', 'preview.py', 'package.json', 'README.md', 'LICENSE',
-              'NOTICE', 'requirements.txt', 'requirements.lock.txt', 'requirements-dev.txt'}
+              'NOTICE', 'requirements.txt', 'requirements.lock.txt', 'requirements-dev.txt', 'requirements-browser.txt'}
 SOURCE_DIRS = {'backend', 'docs', 'scripts', 'THIRD_PARTY', 'research', 'tests', 'frontend'}
 EXCLUDED = {'node_modules', '__pycache__', 'dist', 'public', 'artifacts', '.pytest_cache'}
 

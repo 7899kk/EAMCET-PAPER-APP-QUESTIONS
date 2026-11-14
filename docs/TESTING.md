@@ -58,3 +58,19 @@ In this hosted execution environment the API TestClient's event-loop communicati
 After adding optional password protection and trusted hosted-origin handling, all **26 tests passed**. A Docker image containing both the built frontend and actual PDF backend was built successfully with Tesseract. The latest image refresh (hosting wording only) hit the environment disk limit; the task-specific build cache was removed to restore disk capacity. The normal public-host Dockerfile requires no session-specific CA: the cloud build used a temporary CA secret solely for this environment’s outbound HTTPS proxy. No hosting provider deployment or live public URL has been created; Render is awaiting an account connection.
 
 The successfully built container also passed a live loopback smoke test: HTTP password protection, frontend delivery, Tesseract availability, source download, UID 10001 execution, upload, direct text replacement, new text insertion, deletion, rotation, export, and independent MuPDF/Poppler verification. The temporary test container was removed afterward.
+
+## Browser upload regression fix
+
+Reproduced an actual browser failure: when a page is opened using a URL containing HTTP login credentials, a relative `fetch('/api/documents')` is rejected before the server receives it. API requests now resolve against the clean origin and explicitly send same-origin credentials. A successful HTTP login also issues a one-hour signed, HTTP-only, SameSite=Strict cookie (Secure on the hosted HTTPS instance), so browser API calls work when Basic credentials are omitted. Wrong credentials, tampered/expired cookies, password changes, and cross-origin writes remain rejected.
+
+File inputs now keep their selection until processing finishes, and uploads are snapshotted into readable file bytes before the request starts. This avoids depending on a mobile file-provider handle throughout the upload. Unreadable files and network/authentication failures have separate messages. POST requests are not automatically retried, preventing duplicate edits.
+
+All **28 Python tests passed**, and the production React build passed. Chromium browser checks passed at desktop 1440×960 and mobile 390×844: credential-URL login/upload, cookie-only upload, selecting and replacing actual text, download, and independent MuPDF/Poppler reopen. Desktop also checked new text, deletion, and rotation through the UI. No JavaScript errors were recorded. These browser runs used the real local backend with the same password gate, not mocked PDF responses. Previous statements that browser testing was unavailable describe the original build; the installed Chromium runner was available for this later Render-debugging task.
+
+Reproduce the optional browser regression with `pip install -r requirements-browser.txt`. Use an installed Chromium/Chrome, or run `python -m playwright install chromium`. Start a local server in one terminal:
+
+```bash
+FOLIO_PREVIEW_PASSWORD=browser-test-only .venv/bin/python -m uvicorn backend.app:app --host 127.0.0.1 --port 3013
+```
+
+Then run `.venv/bin/python scripts/check_browser_upload.py` in another terminal. It refuses non-loopback destinations and writes screenshots and downloaded test PDFs under `tests/artifacts/browser/`. Override the test URL/password using `FOLIO_TEST_URL` and `FOLIO_TEST_PASSWORD` only for your local test server.

@@ -1,4 +1,4 @@
-import asyncio,io,json,os,secrets,time,threading,base64,binascii
+import asyncio,io,json,os,secrets,time,threading
 from dataclasses import dataclass,field
 from pathlib import Path
 from fastapi import FastAPI,UploadFile,File,Form,Header,HTTPException,Request
@@ -11,6 +11,7 @@ from PIL import UnidentifiedImageError
 from pydantic import BaseModel,Field
 from contextlib import asynccontextmanager
 from . import engine,content
+from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
 MAX_MEMORY=200*1024*1024
@@ -81,14 +82,13 @@ def describe(s):
 @app.middleware('http')
 async def guards(request,call_next):
     password=os.environ.get('FOLIO_PREVIEW_PASSWORD','')
+    auth_header=request.headers.get('authorization','')
+    authenticated_basic=bool(password and valid_basic(auth_header,password))
     if password and request.url.path != '/api/health':
-        provided=b''
-        auth=request.headers.get('authorization','')
-        if auth.lower().startswith('basic '):
-            try: provided=base64.b64decode(auth[6:],validate=True)
-            except (ValueError,binascii.Error): pass
-        if not secrets.compare_digest(provided,('folio:'+password).encode('utf-8')):
-            return Response('Sign in to this private testing instance.',status_code=401,
+        authenticated=authenticated_basic if auth_header else valid_cookie(request.cookies.get(COOKIE_NAME,''),password)
+        if not authenticated:
+            return Response(json.dumps({'detail':'Your editor sign-in expired. Reload this page and sign in again.'}),
+                media_type='application/json',status_code=401,
                 headers={'WWW-Authenticate':'Basic realm="Folio PDF preview", charset="UTF-8"','Cache-Control':'no-store'})
     if request.method in ('POST','DELETE'):
         origin=request.headers.get('origin')
@@ -98,6 +98,10 @@ async def guards(request,call_next):
     length=request.headers.get('content-length')
     if length and int(length)>LIMIT+1024*1024: return Response('Upload exceeds 25 MB.',status_code=413)
     response=await call_next(request)
+    if authenticated_basic:
+        public_url=os.environ.get('FOLIO_PUBLIC_ORIGIN') or os.environ.get('RENDER_EXTERNAL_URL') or str(request.base_url)
+        response.set_cookie(COOKIE_NAME,sign_cookie(password),max_age=COOKIE_TTL,
+            httponly=True,secure=public_url.startswith('https://'),samesite='strict',path='/')
     response.headers['X-Content-Type-Options']='nosniff'; response.headers['Referrer-Policy']='no-referrer'
     if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
     response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"

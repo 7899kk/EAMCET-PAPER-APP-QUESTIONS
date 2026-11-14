@@ -154,3 +154,33 @@ def test_source_archive_excludes_local_documents_and_secrets(tmp_path):
  with zipfile.ZipFile(dest) as archive:
   names=set(archive.namelist()); assert 'pdf-studio/backend/app.py' in names and 'pdf-studio/Dockerfile' in names
   assert not any('.env' in n or '.pdf' in n or 'node_modules' in n for n in names)
+
+def test_preview_cookie_authenticates_browser_upload_without_basic_header(monkeypatch):
+ from backend.auth import COOKIE_NAME
+ monkeypatch.setenv('FOLIO_PREVIEW_PASSWORD','browser-test-only')
+ with TestClient(app,base_url='https://testserver') as c:
+  login=c.get('/',auth=('folio','browser-test-only'))
+  assert login.status_code==200
+  header=login.headers['set-cookie']
+  assert 'HttpOnly' in header and 'Secure' in header and 'SameSite=strict' in header
+  assert COOKIE_NAME in c.cookies
+  upload=c.post('/api/documents',headers={'Origin':'https://testserver'},files={'file':('test.pdf',fixture())})
+  assert upload.status_code==200,upload.text
+  token=upload.json()['token']
+  assert c.get('/api/document/pdf',headers={'X-Session':token}).status_code==200
+  assert c.post('/api/document/operation',headers={'X-Session':token,'Origin':'https://other.example'},json={'operation':'rotate'}).status_code==403
+  assert c.get('/',auth=('folio','wrong')).status_code==401
+  c.cookies.clear()
+  assert c.get('/api/document').status_code==401
+ sessions.clear()
+
+def test_signed_preview_cookie_rejects_tampering_expiry_and_password_changes():
+ import time
+ from backend.auth import sign_cookie,valid_cookie
+ cookie=sign_cookie('test-secret')
+ assert valid_cookie(cookie,'test-secret')
+ assert not valid_cookie(cookie,'different-secret')
+ assert not valid_cookie(cookie+'0','test-secret')
+ assert not valid_cookie(sign_cookie('test-secret',int(time.time())-1),'test-secret')
+ assert not valid_cookie('not-a-cookie','test-secret')
+ assert not valid_cookie('1.'+'x'*1000,'test-secret')
