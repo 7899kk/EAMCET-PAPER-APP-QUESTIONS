@@ -15,4 +15,38 @@
 .fit-word-option input{accent-color:#197454;margin:2px 0 0}
 @media(max-width:850px){.editing:has(.word-editor) .properties-panel{display:none}.word-editor-footer>span{font-size:8px}}
 .word-props-trigger,.word-props-back{display:none}
+.sample-button{display:flex;align-items:center;justify-content:center;gap:7px;margin:14px auto 0;color:#197454;text-decoration:underline;font-size:12px;font-weight:600}
+.tool-bar{justify-content:flex-start;scroll-padding:8px}
+.tool[aria-pressed=true]{color:#145a40;border-color:#bfd5c3;background:#edf6e9;font-weight:600}
+.editing-guide{display:flex;align-items:center;gap:14px;padding:9px 20px;border-bottom:1px solid var(--line);background:#fbfdf8;flex-wrap:wrap}
+.edit-existing-button{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:650;padding:9px 12px;border:1px solid #a9c7b4;border-radius:6px;color:#165b41;background:white;white-space:nowrap}
+.edit-existing-button.active{background:#e2f1e6;border-color:#4b956e}
+.editing-guide>span{font-size:11px;color:#516450}
+.editor-help-button{margin-left:auto;font-size:11px;color:#197454;text-decoration:underline}
+.shape-controls{border-bottom:1px solid var(--line);background:#fafcf8;padding:9px 20px;display:flex;flex-wrap:wrap;align-items:center;gap:9px 16px}
+.shape-types,.shape-style{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.shape-types button{display:flex;align-items:center;gap:5px;padding:8px;font-size:11px;border:1px solid #d8e2d4;border-radius:5px;background:white}
+.shape-types button.active{border-color:#438c60;background:#e7f2e9;color:#155c40}
+.shape-style{font-size:10px;color:#52664f}
+.shape-style label{display:flex;align-items:center;gap:5px}
+.shape-style input[type=color]{width:26px;height:26px;border:1px solid #d6e0d1;padding:2px;border-radius:4px;background:white}
+.shape-style input[type=number]{width:46px;padding:5px;border:1px solid #d6e0d1;border-radius:4px}
+.shape-style input[type=checkbox]{accent-color:#197454}
+.shape-style .button{padding:7px 9px;font-size:10px}
+.shape-delete{color:#a53c30;border:1px solid #e6bfb9}
+.shape-controls>p{width:100%;font-size:10px;color:#52664f;margin:0}
+.pdf-surface.tool-shapes{cursor:crosshair;touch-action:none}
+.shape-object{position:absolute;z-index:4;cursor:move;touch-action:none;min-width:4px;min-height:4px}
+.shape-hit{display:block;position:absolute;inset:-5px;border:1px dashed transparent;background:transparent;cursor:move;touch-action:none}
+.shape-hit:hover{border-color:#5f9c7a;background:#1d7b5b0a}
+.shape-selected{outline:2px solid #2b8a62;outline-offset:3px}
+.shape-resize{position:absolute;right:-8px;bottom:-8px;background:#fff;border:2px solid #197454;border-radius:2px;width:15px;height:15px;cursor:nwse-resize;touch-action:none;z-index:6}
+.shape-preview{position:absolute;inset:0;pointer-events:none;z-index:5;opacity:.7}
+.shapes-mode .properties-panel{display:none}
+.shapes-mode .workspace{grid-template-columns:195px minmax(0,1fr)}
+.canvas-area{min-height:0}
+.editing>.header,.editing>.workspace-bar,.editing>.tool-bar,.editing>.editing-guide,.editing>.shape-controls,.editing>.bottom-status{flex-shrink:0}
+@media(max-width:1100px){.shapes-mode .workspace{grid-template-columns:155px minmax(0,1fr)}}
+@media(max-width:850px){.shapes-mode .workspace{grid-template-columns:130px minmax(0,1fr)}.editing-guide{padding:7px 12px;gap:8px}.editing-guide>span{font-size:10px}.shape-controls{padding:8px 12px}}
+@media(max-width:600px){.edit-existing-button{font-size:11px;padding:8px}.editing-guide{gap:6px}.editing-guide>span{flex:1;min-width:85px;font-size:9px}.editor-help-button{font-size:9px}.shape-controls{padding:7px 10px;gap:7px}.shape-types{gap:4px}.shape-types button{font-size:9px;padding:7px 5px;gap:4px}.shape-types svg{width:13px}.shape-controls>p{font-size:9px}.shape-style{gap:8px}.shape-resize{width:20px;height:20px;right:-10px;bottom:-10px}.shape-hit{inset:-7px}.sample-button{font-size:11px}.canvas-top>span{max-width:calc(100% - 64px)}.canvas-top{height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}.tool{font-size:9px;color:#53684e}.editing.shapes-mode .workspace{display:flex}}
 @media(max-width:850px){.word-props-trigger,.word-props-back{display:inline-flex}.word-props-trigger{margin-left:auto}.editing.word-properties-open:has(.word-editor) .properties-panel{display:flex}.editing.word-properties-open .word-editor{display:none}}

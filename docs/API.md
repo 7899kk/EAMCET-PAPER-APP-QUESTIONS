@@ -5,12 +5,14 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/health` | Engine health, installed OCR languages, upload/page limits |
+| GET | `/sample.pdf` | Generated editable sample PDF; uses the normal upload workflow |
 | POST | `/documents` | Multipart `file` PDF, optional `password`; returns token and document info |
 | POST | `/images-to-pdf` | Multipart repeated `files`; returns a new document token |
 | GET | `/document` | Page dimensions/rotation, metadata, bytes, undo/redo availability |
 | GET | `/document/pdf` | Current actual PDF bytes |
 | GET | `/document/page/{zero-based-page}/text` | Rendered spans plus word targets with bounding boxes, string IDs, source parts and `editable` flags / reasons |
 | GET | `/document/page/{page}/thumbnail` | PNG thumbnail |
+| GET | `/document/page/{page}/shapes` | Supported Square/Circle/Line annotations with IDs, geometry, style and editability |
 | POST | `/document/operation` | JSON `{ "operation": "...", "args": {...} }`; commits an actual PDF version |
 | POST | `/document/file-operation` | Multipart `operation`, `args` JSON, and `file`; merge/insert/image |
 | POST | `/document/history/undo` | Restore earlier PDF bytes |
@@ -26,6 +28,9 @@ Every page index is **zero-based**. Coordinates are PDF points (72 pt = one inch
 | Operation | Args |
 |---|---|
 | `replace-word` | `page`, string `id` from the latest `words` array, `original` selected word, replacement `text`, optional `size`, `color`, `fit` (default true) |
+| `shape-add` | `page`, `type` (`rectangle`, `ellipse`, `line`, `arrow`), `rect`, optional `points` for directed lines, `color`, `fill` hex or null, `width` 0.5–12 pt |
+| `shape-update` | `page`, latest shape `id`, and full geometry/type/style fields from `shape-add` |
+| `shape-delete` | `page`, shape `id` |
 | `replace` | `page`, text run `id` from the latest text endpoint, `text`, optional `size`, `color` |
 | `find-replace` | `find`, `replacement`; supported spans only across all pages |
 | `text`, `stamp` | `page`, `text`, `x`, `y` (baseline), `size` 4–144, `color` hex, `font` (`helv`, `tiro`, `cour`, `hebo`) |

@@ -12,6 +12,8 @@ from pydantic import BaseModel,Field
 from contextlib import asynccontextmanager
 from . import engine,content
 from .words import inspect_words
+from .shapes import inspect_shapes
+from .sample import sample_pdf
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
@@ -104,7 +106,7 @@ async def guards(request,call_next):
         response.set_cookie(COOKIE_NAME,sign_cookie(password),max_age=COOKIE_TTL,
             httponly=True,secure=public_url.startswith('https://'),samesite='strict',path='/')
     response.headers['X-Content-Type-Options']='nosniff'; response.headers['Referrer-Policy']='no-referrer'
-    if request.url.path.startswith('/api'): response.headers['Cache-Control']='no-store'
+    if request.url.path.startswith('/api') or request.url.path=='/': response.headers['Cache-Control']='no-store'
     response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"
     return response
 
@@ -124,7 +126,11 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'word-shapes-2','editable_shapes':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+
+@app.get('/api/sample.pdf')
+def sample():
+    return Response(sample_pdf(),media_type='application/pdf',headers={'Content-Disposition':'attachment; filename="folio-sample.pdf"'})
 
 @app.post('/api/documents')
 async def upload(file:UploadFile=File(...),password:str=Form('')):
@@ -159,6 +165,10 @@ def text(page:int,x_session:str=Header(...)):
     s=get_session(x_session)
     if not 0<=page<len(describe(s)['pages']): raise ValueError('Invalid page.')
     return {'spans':content.inspect(s.data,page),'words':inspect_words(s.data,page)}
+
+@app.get('/api/document/page/{page}/shapes')
+def shapes(page:int,x_session:str=Header(...)):
+    return {'shapes':inspect_shapes(get_session(x_session).data,page)}
 
 @app.get('/api/document/page/{page}/thumbnail')
 def thumbnail(page:int,x_session:str=Header(...)):

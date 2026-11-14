@@ -98,4 +98,4 @@ async def main():
    await context.close()
   await browser.close()
 
-asyncio.run(main())
+if __name__=='__main__':asyncio.run(main())

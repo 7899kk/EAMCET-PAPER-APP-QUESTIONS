@@ -4,6 +4,7 @@ import pikepdf
 from PIL import Image
 from .content import replace,inspect
 from .words import replace_word
+from . import shapes
 
 MAX_PAGES=300
 
@@ -63,7 +64,9 @@ def apply(data,op,args,extra=None):
         if not 0<=page_index<len(doc): raise ValueError('Invalid page.')
         page=doc[page_index]; color=rgb(args.get('color','#263449')); size=float(args.get('size',16))
         if not 4<=size<=144: raise ValueError('Font size must be 4–144 pt.')
-        if op=='pages':
+        if op in ('shape-add','shape-update','shape-delete'):
+            shapes.apply(page,op,args,rgb)
+        elif op=='pages':
             indices=args['indices']
             if not isinstance(indices,list) or not 1<=len(indices)<=MAX_PAGES or any(type(i)!=int or not 0<=i<len(doc) for i in indices): raise ValueError('Invalid page order; keep at least one page.')
             doc.select(indices)

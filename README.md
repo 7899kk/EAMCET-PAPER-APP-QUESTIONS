@@ -33,8 +33,8 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 
 ## Primary workflow
 
-1. Upload a selectable PDF (or use `tests/artifacts/selectable.pdf`).
-2. Choose **Edit text** and click one underlined word. The on-page input contains only that word. Grey words explain why they are read-only.
+1. Upload a selectable PDF, or click **Try sample PDF** on the landing page.
+2. Choose **Edit existing text** above the page and click one underlined word. The on-page input contains only that word. The visible word count reports editability; grey words explain why they are read-only. The toolbar stays visible while the PDF scrolls.
 3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Esc** cancels. Word properties can change size and colour; the original font is retained. Fit-to-space is on by default to keep neighboring text in place.
 4. Choose **Add text**, enter text, and click the page to place it. This is explicitly new content.
 5. Delete a page from its thumbnail and rotate another page.
@@ -48,6 +48,7 @@ On phones, click a word to use the on-page input; its properties icon opens font
 - Real upload, PDF.js rendering, thumbnails, zoom, text search, actual PDF download, undo/redo, loading/error feedback.
 - Direct existing word replacement using glyph positions and encoded PDF operands (Tj/TJ and supported quote operators); supports simple standard fonts and compatible single-width ToUnicode / Identity-H fonts. Existing font size and fill colour can change.
 - New text with four standard font choices; raster images / signature images; rectangular outlines, lines, rectangular highlights, comments, text stamps, page numbers, translucent text watermarks.
+- A **Shapes** picker with rectangle, ellipse, line and arrow. Added shapes are real PDF annotations: select, drag to move, resize from the corner, change border/fill/width, delete, undo/redo, download and reselect after reopening. Supported imported shape annotations work too; flattened page artwork is not selectable.
 - Merge, insert another PDF, delete, rotate, reorder with up/down controls, duplicate, split each selected page to ZIP, extract selected pages to PDF.
 - PDF → PNG ZIP; PNG/JPEG/WebP → PDF; PDF → plain text; embedded raster-image extraction.
 - Tesseract OCR with installed language packs; metadata editing; PDF stream compression; AES-256 protection; opening/decrypting with the known password; permanent area redaction; crop.
