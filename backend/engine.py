@@ -3,6 +3,7 @@ import pymupdf as fitz
 import pikepdf
 from PIL import Image
 from .content import replace,inspect
+from .words import replace_word
 
 MAX_PAGES=300
 
@@ -44,6 +45,8 @@ def rect_for(page,coords):
 
 def apply(data,op,args,extra=None):
     page_index=int(args.get('page',0))
+    if op=='replace-word':
+        return replace_word(data,page_index,str(args['id']),args['original'],args['text'],args.get('size'),args.get('color'),args.get('fit',True))
     if op=='find-replace':
         find=str(args.get('find','')); replacement=str(args.get('replacement',''))
         if not find or len(find)>500: raise ValueError('Enter search text (up to 500 characters).')

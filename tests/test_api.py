@@ -184,3 +184,23 @@ def test_signed_preview_cookie_rejects_tampering_expiry_and_password_changes():
  assert not valid_cookie(sign_cookie('test-secret',int(time.time())-1),'test-secret')
  assert not valid_cookie('not-a-cookie','test-secret')
  assert not valid_cookie('1.'+'x'*1000,'test-secret')
+
+def test_api_exposes_words_and_replaces_only_selected_word(client):
+ c=client;_,headers=upload(c)
+ response=c.get('/api/document/page/0/text',headers=headers);assert response.status_code==200
+ payload=response.json();assert 'spans' in payload
+ words=payload['words'];assert [w['text'] for w in words]==['Original','contract']
+ original_contract=words[1]['bbox']
+ changed=c.post('/api/document/operation',headers=headers,json={'operation':'replace-word','args':{'page':0,'id':words[0]['id'],'original':'Original','text':'Revised'}})
+ assert changed.status_code==200,changed.text
+ after=c.get('/api/document/page/0/text',headers=headers).json()['words']
+ assert [w['text'] for w in after]==['Revised','contract']
+ assert after[1]['bbox']==pytest.approx(original_contract,abs=.02)
+ downloaded=c.post('/api/document/export',headers=headers,json={'kind':'pdf'})
+ with f.open(stream=downloaded.content,filetype='pdf') as doc:
+  assert doc[0].get_text().strip()=='Revised contract'
+  assert not doc[0].get_drawings()
+ assert c.post('/api/document/history/undo',headers=headers).status_code==200
+ assert c.get('/api/document/page/0/text',headers=headers).json()['words'][0]['text']=='Original'
+ assert c.post('/api/document/history/redo',headers=headers).status_code==200
+ assert c.get('/api/document/page/0/text',headers=headers).json()['words'][0]['text']=='Revised'

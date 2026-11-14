@@ -9,7 +9,7 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | POST | `/images-to-pdf` | Multipart repeated `files`; returns a new document token |
 | GET | `/document` | Page dimensions/rotation, metadata, bytes, undo/redo availability |
 | GET | `/document/pdf` | Current actual PDF bytes |
-| GET | `/document/page/{zero-based-page}/text` | Rendered spans with bounding boxes and `editable` flags / reasons |
+| GET | `/document/page/{zero-based-page}/text` | Rendered spans plus word targets with bounding boxes, string IDs, source parts and `editable` flags / reasons |
 | GET | `/document/page/{page}/thumbnail` | PNG thumbnail |
 | POST | `/document/operation` | JSON `{ "operation": "...", "args": {...} }`; commits an actual PDF version |
 | POST | `/document/file-operation` | Multipart `operation`, `args` JSON, and `file`; merge/insert/image |
@@ -25,6 +25,7 @@ Every page index is **zero-based**. Coordinates are PDF points (72 pt = one inch
 
 | Operation | Args |
 |---|---|
+| `replace-word` | `page`, string `id` from the latest `words` array, `original` selected word, replacement `text`, optional `size`, `color`, `fit` (default true) |
 | `replace` | `page`, text run `id` from the latest text endpoint, `text`, optional `size`, `color` |
 | `find-replace` | `find`, `replacement`; supported spans only across all pages |
 | `text`, `stamp` | `page`, `text`, `x`, `y` (baseline), `size` 4–144, `color` hex, `font` (`helv`, `tiro`, `cour`, `hebo`) |
@@ -38,7 +39,9 @@ Every page index is **zero-based**. Coordinates are PDF points (72 pt = one inch
 | `compress` | none; rewrite with garbage collection and deflated streams |
 | `ocr` | `languages: "eng"`, or installed Tesseract codes joined by `+` |
 
-Text run IDs depend on current content-stream instruction offsets. Fetch them again after every operation/undo/redo. Replacement glyphs must exist in the font. Repeated/ambiguous spans are read-only. No overlay fallback is performed.
+Word IDs identify source instruction/character ranges; IDs and the expected `original` word must come from the latest response. Word edits replace that occurrence only, preserve adjacent operands/kerning and positions, and support repeated words and compatible words split across instructions. A blank replacement removes the word while keeping its layout space. Fit condenses a longer replacement to the original word width. No paragraph reflow is performed.
+
+Legacy text run IDs depend on current content-stream instruction offsets. Fetch them again after every operation/undo/redo. Replacement glyphs must exist in the font. Repeated/ambiguous spans are read-only. No overlay fallback is performed.
 
 File operations: `merge` appends all pages; `insert` accepts `at` (0-based insertion position); both accept known `password` if the attached PDF requires it. `image` accepts `page` and `rect` and re-encodes supported PNG/JPEG/WebP images into PNG before embedding. Original image proportion is retained.
 

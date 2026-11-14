@@ -26,7 +26,7 @@ async def settled(page):
 
 async def upload(page):
  await page.locator('input[type=file]').first.set_input_files(FIXTURE)
- await expect(page.locator('.text-target')).to_have_count(1,timeout=20000)
+ await expect(page.get_by_role('button',name='Edit word: Original',exact=True)).to_be_visible(timeout=20000)
  await expect(page.get_by_role('alert')).to_have_count(0)
  await settled(page)
 
@@ -57,17 +57,22 @@ async def main():
    page.on('requestfailed',lambda r:failed.append(r.failure))
    await page.goto(BASE,wait_until='networkidle')
    await upload(page)
-   await page.get_by_role('button',name='Edit text: Original contract',exact=True).click()
-   await page.locator('.properties-panel textarea').fill('Browser verified contract')
-   await page.get_by_role('button',name='Apply text changes',exact=True).click()
-   await expect(page.get_by_role('button',name='Edit text: Browser verified contract',exact=True)).to_be_visible()
+   await page.get_by_role('button',name='Edit word: Original',exact=True).click()
+   if mobile:
+    await page.get_by_role('button',name='Show word properties',exact=True).click()
+    await expect(page.get_by_role('textbox',name='Replacement word',exact=True)).to_have_value('Original')
+    await page.get_by_role('button',name='Back to word editor',exact=True).click()
+   await expect(page.get_by_role('textbox',name='Edit selected word',exact=True)).to_have_value('Original')
+   await page.get_by_role('textbox',name='Edit selected word',exact=True).fill('Revised')
+   await page.get_by_role('textbox',name='Edit selected word',exact=True).press('Enter')
+   await expect(page.get_by_role('button',name='Edit word: Revised',exact=True)).to_be_visible()
    if not mobile:
     await page.get_by_role('button',name='Add text',exact=True).click()
     await page.locator('.properties-panel textarea').fill('Browser added note')
     await page.locator('.pdf-surface').click(position={'x':80,'y':180})
     await expect(page.locator('.busy-layer')).to_have_count(0)
     await page.get_by_role('button',name='Edit text',exact=True).click()
-    await expect(page.get_by_role('button',name='Edit text: Browser added note',exact=True)).to_be_visible()
+    await expect(page.get_by_role('button',name='Edit word: Browser',exact=True)).to_be_visible()
     await page.get_by_role('button',name='Delete page 2',exact=True).click()
     await expect(page.locator('.page-card')).to_have_count(2)
     await page.get_by_role('button',name='Open page 2',exact=True).click()
@@ -83,10 +88,10 @@ async def main():
    await download.save_as(dest)
    with fitz.open(dest) as doc:
     text=''.join(p.get_text() for p in doc)
-    assert 'Browser verified contract' in text and 'Original contract' not in text
+    assert 'Revised contract' in text and 'Original contract' not in text
     if not mobile:assert len(doc)==2 and doc[1].rotation==90 and 'Browser added note' in text
    independent=subprocess.check_output(['pdftotext',str(dest),'-'],text=True)
-   assert 'Browser verified contract' in independent and 'Original contract' not in independent
+   assert 'Revised contract' in independent and 'Original contract' not in independent
    assert not errors,errors
    assert not [e for e in failed if e!='net::ERR_ABORTED'],failed
    print(json.dumps({'viewport':'mobile' if mobile else 'desktop','upload':'passed','cookie_only_login':'passed','existing_text_edit':'passed','download_reopen':'passed','browser_errors':errors}),flush=True)

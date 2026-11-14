@@ -74,3 +74,11 @@ FOLIO_PREVIEW_PASSWORD=browser-test-only .venv/bin/python -m uvicorn backend.app
 ```
 
 Then run `.venv/bin/python scripts/check_browser_upload.py` in another terminal. It refuses non-loopback destinations and writes screenshots and downloaded test PDFs under `tests/artifacts/browser/`. Override the test URL/password using `FOLIO_TEST_URL` and `FOLIO_TEST_PASSWORD` only for your local test server.
+
+## Word-level editing
+
+The primary editor now selects individual words and offers a focused on-page input, Enter/Save, Escape/Cancel, and word-specific properties. It uses actual PDF glyph positions to resolve repeated words and supported words split across several text-showing instructions. It modifies encoded source ranges only; it does not redact or cover the original text. Fit-to-space condenses longer replacements horizontally and keeps surrounding text in place. Font, colour, kerning, and source operands outside the selected word are preserved.
+
+**46 tests passed** after this change, including repeated occurrences, identical repeated lines, words split across operators, original TJ kerning, quote operators, embedded Unicode fonts, character/word spacing, scaled text, colour/size changes, deletion, unsupported glyphs, scanned/rotated/mixed-style cases, API export and undo/redo. Word edits are tested through later additions, compression, metadata changes, and MuPDF stream cleanup, with independent Poppler reopening. This also corrected an invalid text-object cleanup interaction from the previous run-level implementation.
+
+Desktop/mobile Chromium tests click the single word “Original” in “Original contract,” type “Revised” in the on-page input, save with Enter, and verify “Revised contract” in the downloaded PDF. Desktop additionally adds text and changes pages. The test waits for the PDF canvas to finish drawing. Source and tests are in `backend/words.py`, `tests/test_words.py`, and `scripts/check_browser_upload.py`.

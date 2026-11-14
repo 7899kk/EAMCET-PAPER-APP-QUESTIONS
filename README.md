@@ -34,19 +34,19 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 ## Primary workflow
 
 1. Upload a selectable PDF (or use `tests/artifacts/selectable.pdf`).
-2. Choose **Edit text**, hover a line, and select a supported text run. Green outlines indicate editable text; unsupported text has grey outlines.
-3. Edit its text in the right panel and apply. Size and colour are supported; the original font is retained.
+2. Choose **Edit text** and click one underlined word. The on-page input contains only that word. Grey words explain why they are read-only.
+3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Esc** cancels. Word properties can change size and colour; the original font is retained. Fit-to-space is on by default to keep neighboring text in place.
 4. Choose **Add text**, enter text, and click the page to place it. This is explicitly new content.
 5. Delete a page from its thumbnail and rotate another page.
 6. Each operation immediately saves an actual PDF revision in server memory. Undo and redo retain up to 12 versions.
 7. Click **Download PDF**, then reopen the downloaded file. Save the download before closing or restarting the server.
 
-On phones, open thumbnails with the menu button. Properties appear when a tool or text is selected. The PDF canvas scrolls in both directions; use zoom or Fit width for smaller screens.
+On phones, click a word to use the on-page input; its properties icon opens font size, colour, and fit options. Open thumbnails with the menu button. Properties appear when a tool or text is selected. The PDF canvas scrolls in both directions; use zoom or Fit width for smaller screens.
 
 ## Implemented
 
 - Real upload, PDF.js rendering, thumbnails, zoom, text search, actual PDF download, undo/redo, loading/error feedback.
-- Direct existing text operand replacement for supported horizontal, uniquely matched Tj/TJ text; supports simple standard fonts and compatible single-width ToUnicode / Identity-H fonts. Existing font size and fill colour can change.
+- Direct existing word replacement using glyph positions and encoded PDF operands (Tj/TJ and supported quote operators); supports simple standard fonts and compatible single-width ToUnicode / Identity-H fonts. Existing font size and fill colour can change.
 - New text with four standard font choices; raster images / signature images; rectangular outlines, lines, rectangular highlights, comments, text stamps, page numbers, translucent text watermarks.
 - Merge, insert another PDF, delete, rotate, reorder with up/down controls, duplicate, split each selected page to ZIP, extract selected pages to PDF.
 - PDF → PNG ZIP; PNG/JPEG/WebP → PDF; PDF → plain text; embedded raster-image extraction.
@@ -55,7 +55,7 @@ On phones, open thumbnails with the menu button. Properties appear when a tool o
 
 ## Limitations — read before relying on output
 
-- PDF is not a word processor format. Existing text must match one unique horizontal rendered span and one supported text-showing instruction. Repeated identical text, character fragments, rotated text, outlined text, text in Form XObjects, vertical writing, complex encoding, and unsupported font metrics are read-only. No automatic paragraph reflow, font-family replacement, or arbitrary glyph insertion. Longer replacement text can overlap nearby content; inspect the result. Original TJ internal kerning is replaced with standard glyph advances while the following text position is retained.
+- PDF is not a word processor format. Existing words are matched by their encoded characters and positions. Repeated words/lines and supported words split across multiple PDF text instructions are editable. Rotated or outlined text, text in Form XObjects, overlapping glyphs, mixed styles inside one word, vertical writing, complex scripts/encoding, and unsupported font metrics can remain read-only. No automatic paragraph reflow, font-family replacement, or arbitrary glyph insertion. Longer word replacements are condensed horizontally to fit the original word’s space by default. Disable Fit to use natural width, which can overlap nearby content. Inspect the result. A word edit preserves the original byte strings and TJ kerning outside the selected range. The replacement uses standard glyph advances, and following text keeps its position.
 - Scanned PDFs have no text to select. OCR creates a searchable image-based PDF; it does **not** reconstruct directly editable paragraphs. OCR flattens vector content/annotations and can make recognition errors. This editor does not offer true editing of scanned text.
 - Moving/resizing/removing existing images or arbitrary existing objects is not implemented. New images are placed in a default rectangle; arbitrary drag/resize is not implemented. Highlights are rectangular annotations, not semantic text-range highlights. Stamps are text. Signature images are not cryptographic signatures.
 - Word/Excel export, table reconstruction, digital signature validation/signing, form filling, accessibility-tag preservation, complex-script new text, and editing password-restricted documents without the known password are unsupported.

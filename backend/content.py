@@ -73,17 +73,19 @@ def font_width(font,raw,mapping):
 
 def runs(pdf,page_index):
     page=pdf.pages[page_index]; instructions=list(pikepdf.parse_content_stream(page)); fonts=page.Resources.get('/Font',{})
-    state={'font':None,'size':12.,'spacing':0.,'wordspacing':0.,'render':0}; stack=[]; result=[]
+    state={'font':None,'size':12.,'spacing':0.,'wordspacing':0.,'render':0,'fill_op':'g','fill_args':[0]}; stack=[]; result=[]
     for idx,ins in enumerate(instructions):
         args,op=ins.operands,str(ins.operator)
         if op=='q': stack.append(state.copy())
         elif op=='Q' and stack: state=stack.pop()
+        elif op in ('g','rg','k'): state['fill_op']=op; state['fill_args']=list(args)
+        elif op in ('cs','sc','scn'): state['fill_op']=None
         elif op=='Tf': state['font']=str(args[0]); state['size']=float(args[1])
         elif op=='Tc': state['spacing']=float(args[0])
         elif op=='Tw': state['wordspacing']=float(args[0])
         elif op=='Tr': state['render']=int(args[0])
         elif op in ('Tj','TJ'):
-            font=fonts.get(state['font'])
+            font=fonts.get(state['font']) if state['font'] else None
             if font is None or state['spacing'] or state['wordspacing'] or state['render']!=0: continue
             mapping=cmap(font)
             if not mapping: continue
@@ -126,11 +128,13 @@ def replace(data,page_index,run_id,text,size=None,color=None):
         # Preserve the following text position, including original TJ kerning advance.
         adjustment=newwidth-(run['width']-run['adjust'])*run['size']/newsize
         op=lambda args,name:pikepdf.ContentStreamInstruction(args,pikepdf.Operator(name))
-        replacement=[op([],'q'),op([pikepdf.Name(run['font']),newsize],'Tf')]
+        replacement=[op([pikepdf.Name(run['font']),newsize],'Tf')]
         if color:
+            if not run['fill_op']: raise ValueError('This colour space cannot be safely restored.')
             if not re.fullmatch(r'#[0-9a-fA-F]{6}',color): raise ValueError('Invalid colour.')
             replacement.append(op([int(color[j:j+2],16)/255 for j in (1,3,5)],'rg'))
-        replacement += [op([pikepdf.Array([pikepdf.String(raw),adjustment])],'TJ'),op([],'Q')]
+        replacement += [op([pikepdf.Array([pikepdf.String(raw),adjustment])],'TJ'),op([pikepdf.Name(run['font']),run['size']],'Tf')]
+        if color: replacement.append(op(run['fill_args'],run['fill_op']))
         instructions[run_id:run_id+1]=replacement
         pdf.pages[page_index].Contents=pdf.make_stream(pikepdf.unparse_content_stream(instructions))
         out=io.BytesIO(); pdf.save(out); return out.getvalue()

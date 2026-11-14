@@ -11,6 +11,7 @@ from PIL import UnidentifiedImageError
 from pydantic import BaseModel,Field
 from contextlib import asynccontextmanager
 from . import engine,content
+from .words import inspect_words
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
@@ -123,7 +124,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.post('/api/documents')
 async def upload(file:UploadFile=File(...),password:str=Form('')):
@@ -157,7 +158,7 @@ def pdf(x_session:str=Header(...)): return Response(get_session(x_session).data,
 def text(page:int,x_session:str=Header(...)):
     s=get_session(x_session)
     if not 0<=page<len(describe(s)['pages']): raise ValueError('Invalid page.')
-    return {'spans':content.inspect(s.data,page)}
+    return {'spans':content.inspect(s.data,page),'words':inspect_words(s.data,page)}
 
 @app.get('/api/document/page/{page}/thumbnail')
 def thumbnail(page:int,x_session:str=Header(...)):
