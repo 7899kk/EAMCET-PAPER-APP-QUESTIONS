@@ -54,6 +54,8 @@ async def main():
    # Edit again, then change pages without a separate Save action.
    await expect(page.locator('.inline-text')).to_have_count(0,timeout=20000)
    await page.get_by_role('textbox',name=re.compile('^Edit paragraph: So with this')).click();await expect(field).to_be_focused()
+   # A pause after clearing a paragraph must leave the typing surface available.
+   await field.fill('');await page.wait_for_timeout(800);await expect(field).to_be_focused()
    final='We can make this type of video.';await field.fill(final)
    if mobile:await page.get_by_role('button',name='Toggle page panel',exact=True).click()
    await page.get_by_role('button',name='Open page 2',exact=True).click();await settled(page)

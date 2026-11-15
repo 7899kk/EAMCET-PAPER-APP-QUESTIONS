@@ -11,11 +11,11 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   return()=>{cancelled=true;controller.abort()};
  },[api,session,page,version]);
  useEffect(()=>{if(current.current?.page!==page){current.current=null;setActive(null);clearTimeout(timer.current)}},[session,page]);
- const save=async()=>{
+ const save=async(final=false)=>{
   clearTimeout(timer.current);
-  if(flight.current){const ok=await flight.current;if(!ok)return false;if(draft.current!==saved.current)return save();return !current.current?.error}
+  if(flight.current){const ok=await flight.current;if(!ok)return false;if(draft.current!==saved.current)return save(final);return !current.current?.error}
   const a=current.current;if(!a||draft.current===saved.current)return true;
-  const text=draft.current;setStatus('Saving…');
+  const text=draft.current;if(!final&&!text.trim())return true;setStatus('Saving…');
   const job=(async()=>{try{
    const result=await(await api('/document/inline-edit',{method:'POST',body:JSON.stringify({operation:'replace-block',args:{page:a.page,id:a.id,original:saved.current,text,rect:a.rect,size:a.size,color:a.color}})})).json();
    if(current.current?.editSession!==a.editSession)return true;
@@ -29,12 +29,12 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   if(success&&draft.current!==saved.current)timer.current=setTimeout(()=>save(),350);
   return success;
  };
- const finish=async()=>{const before=current.current;if(!await save())return false;const a=current.current;if(a&&a.editSession===before?.editSession){const next={...a,closing:true};current.current=next;setActive(next)}return true};
+ const finish=async()=>{const before=current.current;if(!await save(true))return false;const a=current.current;if(a&&a.editSession===before?.editSession){const next={...a,closing:true};current.current=next;setActive(next)}return true};
  finishRef.current=finish;
  const activate=async(block,point=null)=>{
   if(!block.editable){setError(block.reason||'This text structure is read-only.');return}
   if(current.current?.id===block.id&&!current.current.closing)return;
-  if(!await save())return;
+  if(!await save(true))return;
   setError('');
   const next={...block,page,editSession:++sequence.current,closing:false};current.current=next;draft.current=block.text;saved.current=block.text;click.current=point;setMasked(block.id==='new');setFace(null);setActive(next);setStatus('Preparing text…');
  };
@@ -64,7 +64,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  const input=()=>{
   const el=element.current,a=current.current;draft.current=el?.innerText.replace(/\r/g,'').replace(/\t/g,'    ').replace(/\u00a0/g,' ')||'';
-  if(a){a.error=null;const ratio=Number(el.dataset.zoom),max=(a.max_size||a.size)*ratio,min=max*.65,target=(a.rect[3]-a.rect[1])*ratio;let size=max;el.style.fontSize=size+'px';for(let i=0;i<16&&el.scrollHeight>target+2&&size>min;i++){size=Math.max(min,size-.35*ratio);el.style.fontSize=size+'px'}}
+  if(a){a.error=null;const ratio=Number(el.dataset.zoom),max=(a.max_size||a.size)*ratio,min=Math.max(4*ratio,max*.65),target=(a.rect[3]-a.rect[1])*ratio;let size=max;el.style.fontSize=size+'px';for(let i=0;i<16&&el.scrollHeight>target+2&&size>min;i++){size=Math.max(min,size-.35*ratio);el.style.fontSize=size+'px'}}
   setStatus('Editing…');clearTimeout(timer.current);timer.current=setTimeout(()=>save(),550);
  };
  const revert=()=>{clearTimeout(timer.current);setError('');draft.current=saved.current;if(element.current)element.current.textContent=saved.current;if(current.current)current.current.error=null;finish()};
