@@ -5,6 +5,8 @@ from PIL import Image
 from .content import replace,inspect
 from .words import replace_word
 from . import shapes
+from . import layers
+from .readable import replace_readable
 
 MAX_PAGES=300
 
@@ -46,6 +48,18 @@ def rect_for(page,coords):
 
 def apply(data,op,args,extra=None,word_targets=None):
     page_index=int(args.get('page',0))
+    if op=='replace-readable':return replace_readable(data,page_index,args,word_targets)
+    if op in ('text','stamp'):return layers.add(data,page_index,{**args,'type':'text'})
+    if op=='image':return layers.add(data,page_index,{**args,'type':'image'},extra)
+    if op=='brush':return layers.add(data,page_index,{**args,'type':'brush'})
+    if op=='layer-update':return layers.update(data,page_index,args)
+    if op=='layer-delete':return layers.remove(data,page_index,str(args['id']))
+    if op=='redact':
+        # Remove intersected managed objects completely, including their private
+        # editing metadata. Otherwise redacted text could survive in /FolioLayer.
+        area=fitz.Rect(args['rect'])
+        for item in layers.inspect_layers(data,page_index):
+            if area.intersects(fitz.Rect(item['rect'])):data=layers.remove(data,page_index,item['id'])
     if op=='replace-word':
         return replace_word(data,page_index,str(args['id']),args['original'],args['text'],args.get('size'),args.get('color'),args.get('fit',True),word_targets)
     if op=='find-replace':
@@ -76,14 +90,6 @@ def apply(data,op,args,extra=None,word_targets=None):
             with fitz.open(stream=clean,filetype='pdf') as other:
                 if len(doc)+len(other)>MAX_PAGES: raise ValueError('Combined PDF exceeds 300 pages.')
                 doc.insert_pdf(other,start_at=int(args.get('at',len(doc))))
-        elif op in ('text','stamp'):
-            text=str(args.get('text',''))[:4000]
-            if not text.strip(): raise ValueError('Enter text.')
-            try: text.encode('cp1252')
-            except UnicodeError: raise ValueError('New text currently supports Western Latin characters only.')
-            point=fitz.Point(float(args.get('x',72)),float(args.get('y',90)))
-            if not page.rect.contains(point): raise ValueError('Click inside the page.')
-            page.insert_text(point,text,fontsize=size,fontname=args.get('font','helv'),color=color)
         elif op in ('rectangle','highlight','redact','crop','line'):
             rect=rect_for(page,args['rect'])
             if page.rotation and op!='crop': raise ValueError('Rotate this page back to 0° before drawing on it.')
@@ -100,13 +106,6 @@ def apply(data,op,args,extra=None,word_targets=None):
         elif op=='comment':
             if page.rotation: raise ValueError('Rotate to 0° before placing a comment.')
             annot=page.add_text_annot((float(args.get('x',72)),float(args.get('y',90))),str(args['text'])[:4000]); annot.update()
-        elif op=='image':
-            if not extra: raise ValueError('Choose an image.')
-            with Image.open(io.BytesIO(extra)) as im:
-                if im.width*im.height>25_000_000: raise ValueError('Image exceeds 25 megapixels.')
-                im.load(); buf=io.BytesIO(); im.convert('RGB').save(buf,format='PNG')
-            if page.rotation: raise ValueError('Rotate to 0° before placing an image.')
-            page.insert_image(rect_for(page,args['rect']),stream=buf.getvalue(),keep_proportion=True)
         elif op in ('numbers','watermark'):
             for i,p in enumerate(doc):
                 if op=='numbers': p.insert_text((p.rect.width/2-8,p.rect.height-25),str(i+1),fontsize=11,color=color)
@@ -117,16 +116,9 @@ def apply(data,op,args,extra=None,word_targets=None):
         elif op=='compress': pass
         elif op=='ocr':
             langs=str(args.get('languages','eng'))
-            available=ocr_languages()
-            if not all(v in available for v in langs.split('+')): raise ValueError('Install the requested Tesseract language packs first.')
-            output=fitz.open()
-            for p in doc:
-                pix=p.get_pixmap(dpi=150)
-                with tempfile.TemporaryDirectory(prefix='folio-ocr-') as tmp:
-                    source=os.path.join(tmp,'page.png'); pix.save(source); dest=os.path.join(tmp,'result')
-                    subprocess.run(['tesseract',source,dest,'-l',langs,'pdf'],check=True,timeout=90,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
-                    with fitz.open(dest+'.pdf') as part: output.insert_pdf(part)
-            result=output.tobytes(garbage=4,deflate=True); output.close(); return result
+            if not langs or not all(v in ocr_languages() for v in langs.split('+')):raise ValueError('The requested Tesseract language is not installed.')
+            from .ocr import process
+            return process(data,langs,args.get('mode','searchable'),args.get('indices'))[0]
         else: raise ValueError('Unsupported operation.')
         return doc.tobytes(garbage=4,deflate=True,clean=True,encryption=fitz.PDF_ENCRYPT_NONE)
 

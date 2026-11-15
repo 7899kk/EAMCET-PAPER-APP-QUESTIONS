@@ -55,3 +55,26 @@
 @media(max-width:600px){.edit-existing-button{font-size:11px;padding:8px}.editing-guide{gap:6px}.editing-guide>span{flex:1;min-width:85px;font-size:9px}.editor-help-button{font-size:9px}.shape-controls{padding:7px 10px;gap:7px}.shape-types{gap:4px}.shape-types button{font-size:9px;padding:7px 5px;gap:4px}.shape-types svg{width:13px}.shape-controls>p{font-size:9px}.shape-style{gap:8px}.shape-resize{width:20px;height:20px;right:-10px;bottom:-10px}.shape-hit{inset:-7px}.sample-button{font-size:11px}.canvas-top>span{max-width:calc(100% - 64px)}.canvas-top{height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}.tool{font-size:9px;color:#53684e}.editing.shapes-mode .workspace{display:flex}}
 @media(max-width:850px){.word-props-trigger,.word-props-back{display:inline-flex}.word-props-trigger{margin-left:auto}.editing.word-properties-open:has(.word-editor) .properties-panel{display:flex}.editing.word-properties-open .word-editor{display:none}}
 @media(max-width:850px){.editing:not(.word-properties-open):has(.word-editor) .properties-panel{display:none}}
+.word-editor>textarea{width:100%;resize:vertical;min-height:76px;max-height:180px;padding:8px;border:1px solid #8ab59c;border-radius:5px;color:#234c39;font-size:16px;line-height:1.4;background:#fbfdf9}
+.object-box{position:absolute;z-index:6;cursor:move;touch-action:none}
+.object-hit{position:absolute;inset:0;border:1px solid transparent;background:transparent;width:100%;height:100%;cursor:move;touch-action:none}
+.object-hit:hover{border:1px dashed #318b68;background:#278d5810}
+.object-selected{outline:2px solid #247d5e;outline-offset:3px}
+.object-resize{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;border:2px solid #197454;background:white;border-radius:2px;touch-action:none;cursor:nwse-resize;z-index:8}
+.object-controls,.brush-controls{padding:9px 18px;border-bottom:1px solid var(--line);background:#f8fcf6;flex-shrink:0;font-size:11px;color:#405e49}
+.object-selector,.object-properties,.brush-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.object-selector label,.object-properties label,.brush-controls label{display:flex;align-items:center;gap:6px}
+.object-selector select{max-width:310px;padding:7px;border:1px solid #c7d7c4;border-radius:5px;background:white}
+.object-properties{margin-top:8px}.object-properties textarea{width:340px;max-width:100%;height:64px;resize:vertical;padding:7px;border:1px solid #bdcfb9;border-radius:5px;font-size:13px}
+.object-properties select,.object-properties input[type=number]{padding:6px;border:1px solid #bdcfb9;border-radius:4px;background:white}
+.object-properties input[type=number]{width:60px}.object-controls .button{font-size:10px;padding:8px 10px}
+.object-properties input[type=color],.brush-controls input[type=color]{width:30px;height:28px;border:1px solid #bdcfb9;background:white;border-radius:4px;padding:2px}
+.object-hint{font-size:10px;display:flex;align-items:center;gap:6px}
+.layers-mode .properties-panel{display:none}.layers-mode .workspace{grid-template-columns:195px minmax(0,1fr)}
+.pdf-surface.tool-layers{touch-action:none}.brush-preview{position:absolute;inset:0;pointer-events:none;z-index:8}.brush-controls input[type=range]{width:85px;accent-color:#197454}.brush-controls>span{font-size:10px}
+.layer-guide-button{display:flex;align-items:center;gap:5px;padding:8px;border:1px solid #d2dec9;border-radius:5px;font-size:11px;color:#176345;background:white}
+.text-composer{z-index:30}.text-composer>p{font-size:9px;line-height:1.5;color:#687f6c;margin:7px 0 0}.composer-style{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:10px}.composer-style label{display:flex;gap:5px;align-items:center}.composer-style input[type=number]{width:45px;padding:6px;border:1px solid #d2dec9;border-radius:4px}.composer-style input[type=color]{width:28px;height:27px}.composer-style .button{font-size:10px;padding:8px}.composing-text .properties-panel{display:none}
+.busy-layer:has(progress){flex-direction:column}.busy-layer progress{width:240px;accent-color:#197454}
+@media(max-width:1100px){.layers-mode .workspace{grid-template-columns:155px minmax(0,1fr)}}
+@media(max-width:850px){.layers-mode .workspace{grid-template-columns:130px minmax(0,1fr)}}
+@media(max-width:600px){.editing.layers-mode .workspace{display:flex}.object-controls,.brush-controls{padding:8px 10px;font-size:10px}.object-properties{gap:7px}.object-properties textarea{width:100%;height:50px;font-size:13px}.object-hint{width:100%;font-size:9px}.object-selector{gap:7px}.object-selector select{max-width:205px;font-size:10px}.object-resize{width:21px;height:21px;right:-10px;bottom:-10px}.object-controls .button{font-size:9px;padding:7px}.object-properties input[type=number]{width:48px}.layer-guide-button{font-size:10px;padding:8px 6px}.brush-controls input[type=range]{width:65px}.brush-controls>span{width:100%;font-size:9px}}

@@ -51,6 +51,8 @@ Runtime Python transitive package licences were read from installed distribution
 
 ### PDF.js asset licences are distinct
 
+The readable text-layer/OCR-copy engine also embeds six unmodified fonts copied from the pinned PDF.js 5.4.394 standard-font assets. `backend/fonts/` retains the exact font files and both notices: Liberation Sans Regular/Bold are SIL OFL-1.1, with reserved names unchanged and document embedding permitted; Foxit Serif/SerifBold/Fixed/FixedBold use the permissive PDFium/Foxit terms in `LICENSE_FOXIT`. They are not relabelled as AGPL or fetched from a paid font service. These files are included in the corresponding source archive. Unicode encoding is used to avoid silently substituting question marks for punctuation.
+
 These assets are copied locally, with their actual notices in `THIRD_PARTY/pdfjs/` and the build's asset directories:
 
 - Foxit standard fonts: the permissive terms in `LICENSE_FOXIT`.

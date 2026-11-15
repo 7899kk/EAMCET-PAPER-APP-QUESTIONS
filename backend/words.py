@@ -281,8 +281,8 @@ def _replace_range(run, start, end, text, size, color, available_width, fit):
 
 
 def replace_word(data, page_index, identity, original, text, size=None, color=None, fit=True, word_targets=None):
-    if not isinstance(text, str) or len(text) > 200 or any(c.isspace() for c in text):
-        raise ValueError('Edit one word at a time (up to 200 characters, without spaces).')
+    if not isinstance(text, str) or len(text) > 4000 or any(ord(c)<32 for c in text):
+        raise ValueError('Use up to 4000 characters on one line. Spaces are supported; use readable replacement for new lines.')
     words = inspect_words(data, page_index) if word_targets is None else word_targets
     word = next((word for word in words if word['id'] == identity and word['editable']), None)
     if word is None or word['text'] != original:

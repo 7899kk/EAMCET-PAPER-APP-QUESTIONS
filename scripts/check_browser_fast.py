@@ -35,13 +35,13 @@ async def main():
    await field.fill('fast')
    await page.get_by_role('button',name='Save and edit next word',exact=True).click()
    await expect(field).to_have_value('red');assert operations()==2
-   await field.fill('two words');await field.press('Tab')
+   await field.fill('bad\x01text');await field.press('Tab')
    await expect(page.get_by_role('alert')).to_be_visible()
-   await expect(field).to_have_value('two words')
+   await expect(field).to_have_value('bad\x01text')
    exports=len([u for u in requests if u.endswith('/export')])
    await page.get_by_role('button',name='Download PDF',exact=True).click()
    await expect(page.locator('.busy-layer')).to_have_count(0)
-   await expect(field).to_have_value('two words')
+   await expect(field).to_have_value('bad\x01text')
    assert len([u for u in requests if u.endswith('/export')])==exports,'Invalid draft must block download'
    await field.fill('red');await field.press('Escape')
    await page.get_by_role('button',name='Dismiss error',exact=True).click()

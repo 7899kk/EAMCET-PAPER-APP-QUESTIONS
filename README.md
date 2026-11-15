@@ -2,7 +2,7 @@
 
 A local React + PDF.js workspace backed by real FastAPI, pikepdf/qpdf, PyMuPDF/MuPDF, and optional Tesseract processing. No paid API, subscription, external document service, or fake processing.
 
-**This is a working editor with documented limits, not a complete Sejda replacement.** Existing-text edits modify actual PDF text operands. They do not cover the old text or add a replacement overlay.
+**This is a working editor with documented limits, not a complete Sejda replacement.** Short edits change actual PDF text operands. Longer edits remove the original characters and create readable, wrapped vector text layers. No whiteout hides the old text. See the [current editor guide](docs/EDITOR_GUIDE.md).
 
 ## Start locally for ₹0
 
@@ -34,14 +34,14 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 ## Primary workflow
 
 1. Upload a selectable PDF, or click **Try sample PDF** on the landing page.
-2. Choose **Edit existing text** above the page and click one underlined word. The on-page input contains only that word. The visible word count reports editability; grey words explain why they are read-only. The toolbar stays visible while the PDF scrolls.
-3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Tab** saves and moves to the next word; **Shift+Tab** moves back. Next word / Previous word buttons work on phones. **Esc** cancels. Word properties can change size and colour; the original font is retained. Fit-to-space is on by default to keep neighboring text in place.
+2. Choose **Edit existing text** above the page and click one underlined word. The on-page editor starts with that word and accepts phrases with spaces and paragraphs. The visible word count reports editability; grey words explain why they are read-only. The toolbar stays visible while the PDF scrolls.
+3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Tab** saves and moves to the next word; **Shift+Tab** moves back. Next word / Previous word buttons work on phones. **Esc** cancels. Short edits retain the source font where supported. Larger replacements become movable, wrapped vector text boxes at a readable font size; fallback fonts and relocation into free space are disclosed. Shift+Enter adds a line. Surrounding paragraphs are not automatically reflowed.
 4. Choose **Add text**, enter text, and click the page to place it. This is explicitly new content.
 5. Delete a page from its thumbnail and rotate another page.
 6. Each operation immediately saves an actual PDF revision in server memory. Undo and redo retain up to 12 versions.
 7. Click **Download PDF** (which also saves the word currently being edited), then reopen the downloaded file. Save the download before closing or restarting the server.
 
-On phones, click a word to use the on-page input; its properties icon opens font size, colour, and fit options. Open thumbnails with the menu button. Properties appear when a tool or text is selected. The PDF canvas scrolls in both directions; use zoom or Fit width for smaller screens.
+On phones, click a word to use the on-page input; its properties icon opens font size and colour options. Open thumbnails with the menu button. Properties appear when a tool or text is selected. The PDF canvas scrolls in both directions; use zoom or Fit width for smaller screens.
 
 ## Implemented
 
@@ -49,18 +49,18 @@ On phones, click a word to use the on-page input; its properties icon opens font
 
 - Real upload, PDF.js rendering, thumbnails, zoom, text search, actual PDF download, undo/redo, loading/error feedback.
 - Direct existing word replacement using glyph positions and encoded PDF operands (Tj/TJ and supported quote operators); supports simple standard fonts and compatible single-width ToUnicode / Identity-H fonts. Existing font size and fill colour can change.
-- New text with four standard font choices; raster images / signature images; rectangular outlines, lines, rectangular highlights, comments, text stamps, page numbers, translucent text watermarks.
+- Editable wrapped text boxes, image/signature-image layers, a freehand highlighter brush with size/colour/opacity, layer selection/movement/resizing/deletion, comments, stamps, page numbers and watermarks. Layer metadata survives download/reupload.
 - A **Shapes** picker with rectangle, ellipse, line and arrow. Added shapes are real PDF annotations: select, drag to move, resize from the corner, change border/fill/width, delete, undo/redo, download and reselect after reopening. Supported imported shape annotations work too; flattened page artwork is not selectable.
 - Merge, insert another PDF, delete, rotate, reorder with up/down controls, duplicate, split each selected page to ZIP, extract selected pages to PDF.
 - PDF → PNG ZIP; PNG/JPEG/WebP → PDF; PDF → plain text; embedded raster-image extraction.
-- Tesseract OCR with installed language packs; metadata editing; PDF stream compression; AES-256 protection; opening/decrypting with the known password; permanent area redaction; crop.
+- Tesseract OCR with installed language packs, progress/cancellation and searchable or editable text-copy output; metadata editing; PDF stream compression; AES-256 protection; opening/decrypting with the known password; permanent area redaction; crop.
 - Find and replace within supported editable text runs. It skips unsupported spans; font encoding failures roll back the entire operation.
 
 ## Limitations — read before relying on output
 
-- PDF is not a word processor format. Existing words are matched by their encoded characters and positions. Repeated words/lines and supported words split across multiple PDF text instructions are editable. Rotated or outlined text, text in Form XObjects, overlapping glyphs, mixed styles inside one word, vertical writing, complex scripts/encoding, and unsupported font metrics can remain read-only. No automatic paragraph reflow, font-family replacement, or arbitrary glyph insertion. Longer word replacements are condensed horizontally to fit the original word’s space by default. Disable Fit to use natural width, which can overlap nearby content. Inspect the result. A word edit preserves the original byte strings and TJ kerning outside the selected range. The replacement uses standard glyph advances, and following text keeps its position.
-- Scanned PDFs have no text to select. OCR creates a searchable image-based PDF; it does **not** reconstruct directly editable paragraphs. OCR flattens vector content/annotations and can make recognition errors. This editor does not offer true editing of scanned text.
-- Moving/resizing/removing existing images or arbitrary existing objects is not implemented. New images are placed in a default rectangle; arbitrary drag/resize is not implemented. Highlights are rectangular annotations, not semantic text-range highlights. Stamps are text. Signature images are not cryptographic signatures.
+- PDF is not a word processor format. Existing words are matched by their encoded characters and positions. Repeated words/lines and supported words split across multiple PDF text instructions are editable. Rotated or outlined text, text in Form XObjects, overlapping glyphs, mixed styles inside one word, vertical writing, complex scripts/encoding, and unsupported font metrics can remain read-only. No automatic paragraph reflow, font-family replacement, or arbitrary glyph insertion. The current UI never squeezes larger replacements into a small word width: it uses a wrapped text layer and available space. Legacy API fit behaviour remains for compatibility only. A word edit preserves the original byte strings and TJ kerning outside the selected range. The replacement uses standard glyph advances, and following text keeps its position.
+- Scanned PDFs have no text to select. Searchable OCR retains the scan with recognized search text. The separate editable text-copy mode reconstructs recognized words into native PDF text, losing original graphics/fonts/exact formatting. It is an explicitly lossy reconstruction, not editing of scanned pixels. OCR has progress/cancellation and can make recognition errors.
+- Moving/resizing/removing existing images or arbitrary existing objects is not implemented. Added images, text boxes and brush highlights have movable/resizable/deletable layers. Arbitrary pre-existing flattened content is not reconstructed as editable objects. Highlights are freehand transparent strokes, not semantic text-range selections. Stamps are text. Signature images are not cryptographic signatures.
 - Word/Excel export, table reconstruction, digital signature validation/signing, form filling, accessibility-tag preservation, complex-script new text, and editing password-restricted documents without the known password are unsupported.
 - New text supports Western Latin only. Most new content tools require page rotation 0°. Compression rewrites/deflates streams and drops unused objects; it does not aggressively downsample images and may increase size.
 - Upload sanitization removes forms, active actions, embedded attachments, and portfolios; it can change or flatten no form content, so don't use this tool to preserve interactive forms. Edits invalidate existing cryptographic signatures. Bookmarks and advanced document structures may change during page organization.

@@ -1,10 +1,10 @@
 # Verification report
 
-Release `fast-words-3`, checked on 2026-11-15.
+Release `readable-layers-4`, checked on 2026-11-15.
 
 ## Results
 
-- **55 Python tests passed** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **66 Python tests passed** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -63,3 +63,21 @@ FOLIO_TEST_URL=http://127.0.0.1:3015 .venv/bin/python scripts/check_browser_fast
 ```
 
 The benchmark also reports median word-only versus combined legacy/word analysis timings for the current machine. It uses generated sample data only.
+
+## Readable replacements, layers, brush and OCR
+
+The reported short-name/long-message case is covered by `tests/test_readable_layers.py`: replace Kartik with Ashok plus a multi-word, multi-paragraph message, verify the original source text is absent, the font stays readable, the box wraps, nearby text is not covered and exported text survives independent Poppler reopening. A phrase that fits stays a direct operand edit. The current UI accepts spaces/newlines and never uses the legacy squeeze-to-fit option.
+
+Added text, image and brush objects are saved as real vector/raster Form objects with private edit metadata. Tests cover text editing, movement, natural-size reflow on resize, expansion around following content, image resizing/removal (including unused image objects), transparent highlighter strokes, deletion, crop coordinate changes and removal of managed editing metadata during redaction. Existing-text source edits still survive compression and other operations. Managed text is edited as a layer rather than through individual glyph targets inside its Form.
+
+Actual Tesseract jobs cover searchable and text-only editable reconstruction, progress, cancellation, missing languages, conflicting edits, unchanged source after cancellation, PDF download and independent extraction. Editable OCR copy words are then genuinely replaced. Its loss of original graphics/fonts/formatting is explicitly labelled.
+
+`check_browser_layers.py` passes at desktop and phone touch sizes: long replacement including spaces/newlines, text-box addition, editing/moving/resizing, image upload/move/resize/delete/undo, brush drawing/delete/undo, download and reopening with layer selection retained. A browser also runs both real OCR modes, searches the searchable result, changes ASHOK to JOHN in the reconstructed copy, downloads and independently reopens it. No mocked engine responses are used. Previous word-only validation expectations were updated because spaces are now valid.
+
+```bash
+FOLIO_TEST_URL=http://127.0.0.1:3015 .venv/bin/python scripts/check_browser_layers.py
+```
+
+Screenshots and generated/downloaded PDFs remain under ignored `tests/artifacts/browser/`. This verifies generated fixtures; arbitrary original fonts, full paragraph reflow, editing scanned pixels and reconstructing arbitrary flattened artwork are not promised.
+
+Text-box fonts are unmodified, explicitly licensed Unicode-capable assets in `backend/fonts/`; punctuation and canonical spaces are checked to prevent silent question-mark or nonbreaking-space substitutions during export.

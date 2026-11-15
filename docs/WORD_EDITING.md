@@ -1,21 +1,9 @@
-# Editing individual existing words
+# Existing-text editing
 
-1. Upload a selectable PDF. The editor starts in **Edit text** mode.
-2. Click one underlined word. The on-page input selects only that word, not its sentence.
-3. Type the replacement. Press **Enter** or **Save**. Press **Esc** to cancel.
-4. Download the PDF and open it in another viewer.
+See [the current editor guide](EDITOR_GUIDE.md) for the complete interaction.
 
-Use **Word properties** for size/colour. On phones, use the properties icon on the small on-page editor. The original font family is retained. Fit-to-space is on by default: longer replacements are condensed horizontally so the next word stays in its original place. Turning Fit off permits natural width, which can overlap adjacent content. Empty the input to remove the selected word while keeping its layout space. Paragraph reflow is not implemented.
+Spaces and paragraphs are accepted. Short replacements use original encoded operands and retain their font/position where supported. Larger replacements remove the selected original characters and create a readable vector text layer, with wrapping, a movable/resizable box and disclosed font fallback. They do not use a whiteout or retain hidden original text. Automatic surrounding-paragraph reflow is unsupported; a text box can be placed in free space instead.
 
-The input is a browser editing control. The saved PDF changes actual encoded text operands. No white rectangle, redaction replacement, or added text overlay is used. Repeated words and compatible words fragmented across multiple text instructions are identified by character positions, not a document-wide string search.
+Legacy API `replace-word` still accepts its optional fit flag for compatibility; the editor uses `replace-readable` and does not condense text by default. Text boxes remain editable through Layers after download/reupload. Scans require either searchable OCR or the explicitly lossy editable text-copy mode. Unsupported source fonts/encodings, complex scripts, reused Form objects and transformations can remain read-only.
 
-Grey words explain why they cannot be edited safely. Unsupported cases include certain fonts/encodings or missing glyphs, complex scripts needing shaping, mixed styles within one word, reused Form XObjects, overlapping glyphs, and rotated/outlined text. A scanned page is an image: it has no existing text word to change. OCR adds searchability; it does not reconstruct editable scanned text. These limitations are shown in the editor.
-
-## Professional-editor references
-
-Reviewed on 2026-11-14:
-
-- [Sejda’s PDF editor](https://www.sejda.com/pdf-editor) documents selecting its Text tool and clicking existing text to edit. It also explicitly lists missing font characters, complex-script limitations, and unsupported editing of scanned text.
-- [iLovePDF’s PDF editor](https://www.ilovepdf.com/edit-pdf) describes adding text, shapes, comments, and highlights. Those additions are distinct from replacing original PDF content.
-
-These public feature descriptions informed the interaction design. No claim is made about the private implementation of either service, and no proprietary editor code was reused. The implementation remains local/open-source Python processing with PDF.js rendering.
+Public professional-editor references: [Sejda](https://www.sejda.com/pdf-editor) and [iLovePDF](https://www.ilovepdf.com/edit-pdf). Their proprietary implementations were not reused. The implementation uses local open-source PDF processing.

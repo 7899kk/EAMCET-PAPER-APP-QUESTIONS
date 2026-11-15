@@ -15,11 +15,14 @@ from . import engine,content
 from .words import inspect_words
 from .shapes import inspect_shapes
 from .sample import sample_pdf
+from . import layers,ocr
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
 MAX_MEMORY=200*1024*1024
 TTL=3600
+ocr_slots=threading.BoundedSemaphore(1)
+ocr_tasks=set()
 @dataclass
 class Session:
     versions:list
@@ -29,6 +32,8 @@ class Session:
     lock:threading.Lock=field(default_factory=threading.Lock)
     word_cache:OrderedDict=field(default_factory=OrderedDict)
     analysis_bytes:int=0
+    generation:int=0
+    job:dict|None=None
     @property
     def data(self): return self.versions[self.cursor]
 
@@ -41,7 +46,12 @@ async def lifespan(app):
             with storage_lock: cleanup()
     task=asyncio.create_task(loop())
     try: yield
-    finally: task.cancel(); sessions.clear()
+    finally:
+        task.cancel()
+        for s in list(sessions.values()):
+            if s.job:s.job['cancel'].set()
+        if ocr_tasks:await asyncio.gather(*list(ocr_tasks),return_exceptions=True)
+        sessions.clear()
 
 class OperationBody(BaseModel):
     operation:str
@@ -55,7 +65,9 @@ app=FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,title='Folio PDF API'
 def cleanup():
     now=time.time()
     for key in list(sessions):
-        if now-sessions[key].touched>TTL: del sessions[key]
+        if now-sessions[key].touched>TTL:
+            if sessions[key].job:sessions[key].job['cancel'].set()
+            del sessions[key]
 
 def get_session(token):
     with storage_lock:
@@ -99,7 +111,20 @@ def commit(s,data):
         versions=versions[-12:]
         other=total_memory()-sum(map(len,s.versions))-s.analysis_bytes
         if other+sum(map(len,versions))>MAX_MEMORY: raise ValueError('Undo history exceeds server memory. Download and reopen your current PDF.')
-        clear_analysis(s);s.versions=versions; s.cursor=len(versions)-1
+        clear_analysis(s);s.versions=versions; s.cursor=len(versions)-1;s.generation+=1
+
+def ensure_idle(s):
+    if s.job and s.job['state']=='running':raise HTTPException(409,'OCR is running. Wait for it to finish or cancel it before editing.')
+
+def changed_info(s,before,operation,args):
+    result=describe(s)
+    if operation in ('replace-readable','text','stamp','image','brush','layer-update'):
+        page=int(args.get('page',0));old={m['id'] for m in layers.inspect_layers(before,page)}
+        active=next((m for m in reversed(layers.inspect_layers(s.data,page)) if m['id'] not in old or operation=='layer-update' and m['id']==args.get('id')),None)
+        if active:
+            result['active_layer']=active
+            if operation!='layer-update' and active.get('note'):result['notice']=active['note']
+    return result
 
 def describe(s):
     with fitz.open(stream=s.data,filetype='pdf') as doc:
@@ -149,7 +174,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'fast-words-3','editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'readable-layers-4','editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -203,6 +228,53 @@ def text(page:int,x_session:str=Header(...),words_only:bool=False):
 def shapes(page:int,x_session:str=Header(...)):
     return {'shapes':inspect_shapes(get_session(x_session).data,page)}
 
+@app.get('/api/document/page/{page}/layers')
+def layer_list(page:int,x_session:str=Header(...)):
+    s=get_session(x_session)
+    return {'layers':layers.inspect_layers(s.data,page)}
+
+@app.post('/api/document/ocr')
+async def start_ocr(body:ExportBody,x_session:str=Header(...)):
+    s=get_session(x_session);args=body.args;langs=str(args.get('languages','eng'));mode=args.get('mode','searchable')
+    available=engine.ocr_languages()
+    if args.get('scope','all') not in ('all','current'):raise ValueError('Choose all pages or current page for OCR.')
+    if not langs or not all(l in available for l in langs.split('+')):raise ValueError('The selected OCR language is not installed on this server.')
+    if mode not in ('searchable','editable'):raise ValueError('Invalid OCR mode.')
+    with s.lock:
+        ensure_idle(s)
+        if not ocr_slots.acquire(blocking=False):raise HTTPException(503,'Another OCR job is running. Please retry shortly.')
+        data=s.data;generation=s.generation;cancel=threading.Event()
+        job={'id':secrets.token_urlsafe(16),'state':'running','completed':0,'total':len(describe(s)['pages']) if args.get('scope','all')=='all' else 1,'message':'Starting local OCR…','cancel':cancel}
+        s.job=job
+    def run():
+        try:
+            def progress(completed,total,message):job.update(completed=completed,total=total,message=message)
+            result,summary=ocr.process(data,langs,mode,None if args.get('scope','all')=='all' else [int(args.get('page',0))],progress,cancel)
+            with s.lock:
+                if cancel.is_set() or s.generation!=generation or sessions.get(x_session) is not s:raise ocr.Cancelled()
+                commit(s,result)
+            job.update(state='complete',summary=summary,message=f"OCR complete: {summary['words']} words across {summary['pages']} pages.")
+        except ocr.Cancelled:job.update(state='cancelled',message='OCR cancelled. Your previous PDF is preserved.')
+        except Exception as exc:job.update(state='failed',message=str(exc) if isinstance(exc,ValueError) else 'OCR failed. Your previous PDF is preserved.')
+        finally:ocr_slots.release()
+    async def worker():await run_in_threadpool(run)
+    task=asyncio.create_task(worker());ocr_tasks.add(task);task.add_done_callback(ocr_tasks.discard)
+    return {'id':job['id'],'state':job['state']}
+
+@app.get('/api/document/ocr')
+def ocr_status(x_session:str=Header(...)):
+    s=get_session(x_session)
+    if not s.job:raise HTTPException(404,'No OCR job is running.')
+    result={k:v for k,v in s.job.items() if k!='cancel'}
+    if result['state']=='complete':result['document']=describe(s)
+    return result
+
+@app.delete('/api/document/ocr')
+def cancel_ocr(x_session:str=Header(...)):
+    s=get_session(x_session)
+    if s.job:s.job['cancel'].set()
+    return {'cancel_requested':True}
+
 @app.get('/api/document/page/{page}/thumbnail')
 def thumbnail(page:int,x_session:str=Header(...)):
     with fitz.open(stream=get_session(x_session).data,filetype='pdf') as doc:
@@ -214,9 +286,10 @@ async def operation(body:OperationBody,x_session:str=Header(...)):
     body=body.model_dump(); s=get_session(x_session)
     def work():
         with s.lock:
+            ensure_idle(s)
             args=body.get('args',{})
-            targets=page_words(s,int(args.get('page',0))) if body['operation']=='replace-word' else None
-            data=engine.apply(s.data,body['operation'],args,word_targets=targets); commit(s,data); return describe(s)
+            targets=page_words(s,int(args.get('page',0))) if body['operation'] in ('replace-word','replace-readable') else None
+            before=s.data;data=engine.apply(before,body['operation'],args,word_targets=targets); commit(s,data); return changed_info(s,before,body['operation'],args)
     return await run_in_threadpool(work)
 
 @app.post('/api/document/file-operation')
@@ -224,17 +297,18 @@ async def file_operation(operation:str=Form(...),args:str=Form('{}'),file:Upload
     extra=await read_file(file); s=get_session(x_session); params=json.loads(args)
     def work():
         with s.lock:
-            commit(s,engine.apply(s.data,operation,params,extra)); return describe(s)
+            ensure_idle(s);before=s.data;commit(s,engine.apply(before,operation,params,extra)); return changed_info(s,before,operation,params)
     return await run_in_threadpool(work)
 
 @app.post('/api/document/history/{direction}')
 def history(direction:str,x_session:str=Header(...)):
     s=get_session(x_session)
     with s.lock:
+        ensure_idle(s)
         target=s.cursor+(-1 if direction=='undo' else 1 if direction=='redo' else 0)
         if direction not in ('undo','redo') or not 0<=target<len(s.versions): raise ValueError('No history in that direction.')
         with storage_lock:
-            clear_analysis(s);s.cursor=target
+            clear_analysis(s);s.cursor=target;s.generation+=1
         return describe(s)
 
 @app.post('/api/document/export')
@@ -251,7 +325,9 @@ def search(q:str,x_session:str=Header(...)):
 
 @app.delete('/api/document')
 def close(x_session:str=Header(...)):
-    with storage_lock: sessions.pop(x_session,None)
+    with storage_lock:
+        s=sessions.pop(x_session,None)
+        if s and s.job:s.job['cancel'].set()
     return {'closed':True}
 
 @app.get('/source.zip',include_in_schema=False)

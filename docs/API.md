@@ -14,6 +14,10 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | GET | `/document/page/{zero-based-page}/text` | Rendered spans plus word targets with bounding boxes, string IDs, source parts and `editable` flags / reasons |
 | GET | `/document/page/{page}/thumbnail` | PNG thumbnail |
 | GET | `/document/page/{page}/shapes` | Supported Square/Circle/Line annotations with IDs, geometry, style and editability |
+| GET | `/document/page/{page}/layers` | Persisted editable text/image/brush Form objects, IDs, geometry and style |
+| POST | `/document/ocr` | Start cancellable local OCR: `{ "args": {"languages":"eng", "mode":"searchable", "scope":"all", "page":0} }` |
+| GET | `/document/ocr` | Job state/progress; complete jobs include summary and new document info |
+| DELETE | `/document/ocr` | Request cancellation; original PDF remains unchanged unless the job already completed |
 | POST | `/document/operation` | JSON `{ "operation": "...", "args": {...} }`; commits an actual PDF version |
 | POST | `/document/file-operation` | Multipart `operation`, `args` JSON, and `file`; merge/insert/image |
 | POST | `/document/history/undo` | Restore earlier PDF bytes |
@@ -30,13 +34,17 @@ The text endpoint accepts `?words_only=true` to skip legacy span detection. Curr
 
 | Operation | Args |
 |---|---|
+| `replace-readable` | `page`, current word `id`, expected `original`, `text` up to 4000 characters including spaces/newlines, optional `size`, `color`. Direct natural-width replacement if safe; otherwise remove original and create a readable wrapped text layer in free space. No horizontal condensation. |
+| `layer-update` | `page`, `id`, optional `rect`, `text`, standard `font`, `size`, `color`, brush `width` / `opacity`; text reflows rather than stretching |
+| `layer-delete` | `page`, `id`; remove drawing instruction and resource, including editing metadata |
+| `brush` | `page`, `points: [[x,y], ...]` (2–2000 points), `width` 0.5–60 pt, `opacity` 0.05–0.8, `color`; transparent vector highlight layer |
 | `replace-word` | `page`, string `id` from the latest `words` array, `original` selected word, replacement `text`, optional `size`, `color`, `fit` (default true) |
 | `shape-add` | `page`, `type` (`rectangle`, `ellipse`, `line`, `arrow`), `rect`, optional `points` for directed lines, `color`, `fill` hex or null, `width` 0.5–12 pt |
 | `shape-update` | `page`, latest shape `id`, and full geometry/type/style fields from `shape-add` |
 | `shape-delete` | `page`, shape `id` |
 | `replace` | `page`, text run `id` from the latest text endpoint, `text`, optional `size`, `color` |
 | `find-replace` | `find`, `replacement`; supported spans only across all pages |
-| `text`, `stamp` | `page`, `text`, `x`, `y` (baseline), `size` 4–144, `color` hex, `font` (`helv`, `tiro`, `cour`, `hebo`) |
+| `text`, `stamp` | `page`, `text` including spaces/newlines, `x`, `y` (box top-left), optional `width` or `rect`, `size` 4–144, `color`, standard `font`; returns a wrapped editable vector layer |
 | `pages` | `indices`: desired page order; repeat indices to duplicate, omit to delete |
 | `rotate` | `page`, `angle` (default 90) |
 | `rectangle`, `line`, `highlight`, `redact`, `crop` | `page`, `rect: [x0,y0,x1,y1]`; optional `color` for non-redaction tools |
@@ -48,6 +56,12 @@ The text endpoint accepts `?words_only=true` to skip legacy span detection. Curr
 | `ocr` | `languages: "eng"`, or installed Tesseract codes joined by `+` |
 
 Word IDs identify source instruction/character ranges; IDs and the expected `original` word must come from the latest response. Word edits replace that occurrence only, preserve adjacent operands/kerning and positions, and support repeated words and compatible words split across instructions. A blank replacement removes the word while keeping its layout space. Fit condenses a longer replacement to the original word width. No paragraph reflow is performed.
+
+That optional fit behaviour belongs to the legacy `replace-word` endpoint. The current UI uses `replace-readable`: natural-size words/phrases when they fit, otherwise a wrapped text layer. Existing encoded source characters are removed, not covered. Font fallback and placement in free space are reported. Full paragraph reflow is unsupported. If there is no space on the page, replacement fails atomically. Responses that create/select a managed object include `active_layer`, and may include a `notice`. This metadata is persisted in the object's Form XObject, not a separate permanent server database.
+
+Image file operations also create managed layers. Use `layer-update` to move/resize and `layer-delete` to remove them. Cropping is reflected in layer coordinates. Redaction removes intersected managed layers completely, including their private text editing metadata, before redacting the original page content; this can remove more than the exact rectangle. Undo retains prior versions until close/expiry.
+
+OCR mode `searchable` preserves scan appearance and search text; already searchable pages retain vector quality. Mode `editable` reconstructs recognized Western Latin text into a text-only PDF and loses original images/graphics/fonts/exact formatting. Scope is `all` or `current`. Poll until `complete`, `cancelled` or `failed`; failed/cancelled jobs preserve the previous version. One OCR job runs per server, with a 90-second per-page deadline. Edits/history are rejected with 409 while the session job runs. OCR progress, cancellation and output do not require a paid service. Only installed languages are accepted. The legacy synchronous `ocr` operation remains compatible but the browser uses the job API.
 
 Legacy text run IDs depend on current content-stream instruction offsets. Fetch them again after every operation/undo/redo. Replacement glyphs must exist in the font. Repeated/ambiguous spans are read-only. No overlay fallback is performed.
 

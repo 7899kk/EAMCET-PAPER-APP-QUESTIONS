@@ -72,7 +72,7 @@ async def main():
     await page.locator('.pdf-surface').click(position={'x':80,'y':180})
     await expect(page.locator('.busy-layer')).to_have_count(0)
     await page.get_by_role('button',name='Edit text',exact=True).click()
-    await expect(page.get_by_role('button',name='Edit word: Browser',exact=True)).to_be_visible()
+    await expect(page.get_by_role('button',name='Select text layer 1',exact=True)).to_be_visible()
     await page.get_by_role('button',name='Delete page 2',exact=True).click()
     await expect(page.locator('.page-card')).to_have_count(2)
     await page.get_by_role('button',name='Open page 2',exact=True).click()

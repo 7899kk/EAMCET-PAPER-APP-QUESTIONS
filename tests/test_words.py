@@ -103,7 +103,9 @@ def test_embedded_unicode_font_and_word_edit():
 
 def test_word_input_and_stale_selection_are_validated():
     original=make_pdf();chosen=inspect_words(original,0)[2]
-    with pytest.raises(ValueError,match='one word'):edit(original,chosen,'two words')
+    changed=edit(original,chosen,'two words')
+    with fitz.open(stream=changed,filetype='pdf') as doc:assert 'two words' in doc[0].get_text()
+    with pytest.raises(ValueError,match='one line'):edit(original,chosen,'two\nwords')
     with pytest.raises(ValueError,match='changed'):replace_word(original,0,chosen['id'],'incorrect','term')
     with pytest.raises(ValueError,match='font does not contain'):edit(original,chosen,'猫')
 
@@ -160,7 +162,9 @@ def test_word_edit_survives_other_pdf_tools_and_stream_cleanup():
     changed=engine.apply(changed,'compress',{})
     assert [w[4] for w in word_boxes(changed)]==['Revised','contract','remains','Added','note']
     words=inspect_words(changed,0)
-    assert all(w['editable'] for w in words)
+    assert all(w['editable'] for w in words[:3])
+    from backend.layers import inspect_layers
+    assert inspect_layers(changed,0)[0]['text']=='Added note'
     changed=edit(changed,next(w for w in words if w['text']=='contract'),'agreement')
     changed=engine.apply(changed,'metadata',{'metadata':{'title':'Actual word edits'}})
     assert [w[4] for w in word_boxes(changed)][:3]==['Revised','agreement','remains']
