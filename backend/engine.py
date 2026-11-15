@@ -44,10 +44,10 @@ def rect_for(page,coords):
     if rect.is_empty or rect.is_infinite or not page.rect.contains(rect): raise ValueError('The rectangle must fit inside the page.')
     return rect
 
-def apply(data,op,args,extra=None):
+def apply(data,op,args,extra=None,word_targets=None):
     page_index=int(args.get('page',0))
     if op=='replace-word':
-        return replace_word(data,page_index,str(args['id']),args['original'],args['text'],args.get('size'),args.get('color'),args.get('fit',True))
+        return replace_word(data,page_index,str(args['id']),args['original'],args['text'],args.get('size'),args.get('color'),args.get('fit',True),word_targets)
     if op=='find-replace':
         find=str(args.get('find','')); replacement=str(args.get('replacement',''))
         if not find or len(find)>500: raise ValueError('Enter search text (up to 500 characters).')

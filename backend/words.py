@@ -149,7 +149,8 @@ def _word_map(data, page_index):
                 if len(glyph['char']) == 1:
                     by_position[_cell(glyph['origin'])].append((run, glyph))
         words = []
-        for block in page.get_text('rawdict')['blocks']:
+        # Word detection never needs embedded image bytes (especially costly on scans).
+        for block in page.get_text('rawdict', flags=fitz.TEXTFLAGS_RAWDICT & ~fitz.TEXT_PRESERVE_IMAGES)['blocks']:
             for line in block.get('lines', []):
                 chars = [{**char, 'style': span} for span in line['spans'] for char in span['chars']]
                 text = ''.join(char['c'] for char in chars)
@@ -279,10 +280,10 @@ def _replace_range(run, start, end, text, size, color, available_width, fit):
     return output
 
 
-def replace_word(data, page_index, identity, original, text, size=None, color=None, fit=True):
+def replace_word(data, page_index, identity, original, text, size=None, color=None, fit=True, word_targets=None):
     if not isinstance(text, str) or len(text) > 200 or any(c.isspace() for c in text):
         raise ValueError('Edit one word at a time (up to 200 characters, without spaces).')
-    words = inspect_words(data, page_index)
+    words = inspect_words(data, page_index) if word_targets is None else word_targets
     word = next((word for word in words if word['id'] == identity and word['editable']), None)
     if word is None or word['text'] != original:
         raise ValueError('This word changed or is not editable. Select it again.')

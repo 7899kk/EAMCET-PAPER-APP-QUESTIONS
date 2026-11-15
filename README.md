@@ -35,15 +35,17 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 
 1. Upload a selectable PDF, or click **Try sample PDF** on the landing page.
 2. Choose **Edit existing text** above the page and click one underlined word. The on-page input contains only that word. The visible word count reports editability; grey words explain why they are read-only. The toolbar stays visible while the PDF scrolls.
-3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Esc** cancels. Word properties can change size and colour; the original font is retained. Fit-to-space is on by default to keep neighboring text in place.
+3. Type the replacement in the on-page input and press **Enter**, or click **Save**. **Tab** saves and moves to the next word; **Shift+Tab** moves back. Next word / Previous word buttons work on phones. **Esc** cancels. Word properties can change size and colour; the original font is retained. Fit-to-space is on by default to keep neighboring text in place.
 4. Choose **Add text**, enter text, and click the page to place it. This is explicitly new content.
 5. Delete a page from its thumbnail and rotate another page.
 6. Each operation immediately saves an actual PDF revision in server memory. Undo and redo retain up to 12 versions.
-7. Click **Download PDF**, then reopen the downloaded file. Save the download before closing or restarting the server.
+7. Click **Download PDF** (which also saves the word currently being edited), then reopen the downloaded file. Save the download before closing or restarting the server.
 
 On phones, click a word to use the on-page input; its properties icon opens font size, colour, and fit options. Open thumbnails with the menu button. Properties appear when a tool or text is selected. The PDF canvas scrolls in both directions; use zoom or Fit width for smaller screens.
 
 ## Implemented
+
+- Fast current-page PDF previews, word-only detection, a bounded current-revision text cache, next-page text prefetch and thumbnails loaded as they become visible. Downloads retain all document pages. See [performance checks](docs/TESTING.md#fast-word-editing).
 
 - Real upload, PDF.js rendering, thumbnails, zoom, text search, actual PDF download, undo/redo, loading/error feedback.
 - Direct existing word replacement using glyph positions and encoded PDF operands (Tj/TJ and supported quote operators); supports simple standard fonts and compatible single-width ToUnicode / Identity-H fonts. Existing font size and fill colour can change.

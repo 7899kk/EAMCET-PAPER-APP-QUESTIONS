@@ -1,4 +1,5 @@
 import asyncio,io,json,os,secrets,time,threading
+from collections import OrderedDict
 from dataclasses import dataclass,field
 from pathlib import Path
 from fastapi import FastAPI,UploadFile,File,Form,Header,HTTPException,Request
@@ -26,6 +27,8 @@ class Session:
     touched:float=field(default_factory=time.time)
     name:str='document.pdf'
     lock:threading.Lock=field(default_factory=threading.Lock)
+    word_cache:OrderedDict=field(default_factory=OrderedDict)
+    analysis_bytes:int=0
     @property
     def data(self): return self.versions[self.cursor]
 
@@ -60,7 +63,27 @@ def get_session(token):
         if session is None: raise HTTPException(404,'Session expired. Upload your PDF again.')
         session.touched=time.time(); return session
 
-def total_memory(): return sum(sum(len(v) for v in s.versions) for s in sessions.values())
+def total_memory(): return sum(sum(len(v) for v in s.versions)+s.analysis_bytes for s in sessions.values())
+
+def clear_analysis(s):
+    s.word_cache.clear();s.analysis_bytes=0
+
+def page_words(s,page):
+    """Caller holds s.lock. Cache only current-revision words within memory limits."""
+    if page in s.word_cache:
+        s.word_cache.move_to_end(page)
+        return s.word_cache[page][0]
+    with fitz.open(stream=s.data,filetype='pdf') as doc:
+        if not 0<=page<len(doc):raise ValueError('Invalid page.')
+    words=inspect_words(s.data,page)
+    cost=len(json.dumps(words).encode())*4
+    if cost<=4*1024*1024:
+        with storage_lock:
+            while s.word_cache and (len(s.word_cache)>=4 or s.analysis_bytes+cost>4*1024*1024 or total_memory()+cost>MAX_MEMORY):
+                _,(_,removed)=s.word_cache.popitem(last=False);s.analysis_bytes-=removed
+            if total_memory()+cost<=MAX_MEMORY:
+                s.word_cache[page]=(words,cost);s.analysis_bytes+=cost
+    return words
 
 def register(data,name):
     with storage_lock:
@@ -74,9 +97,9 @@ def commit(s,data):
     with storage_lock:
         versions=s.versions[:s.cursor+1]+[data]
         versions=versions[-12:]
-        other=total_memory()-sum(map(len,s.versions))
+        other=total_memory()-sum(map(len,s.versions))-s.analysis_bytes
         if other+sum(map(len,versions))>MAX_MEMORY: raise ValueError('Undo history exceeds server memory. Download and reopen your current PDF.')
-        s.versions=versions; s.cursor=len(versions)-1
+        clear_analysis(s);s.versions=versions; s.cursor=len(versions)-1
 
 def describe(s):
     with fitz.open(stream=s.data,filetype='pdf') as doc:
@@ -126,7 +149,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'word-shapes-2','editable_shapes':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'fast-words-3','editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -160,11 +183,21 @@ def info(x_session:str=Header(...)): return describe(get_session(x_session))
 @app.get('/api/document/pdf')
 def pdf(x_session:str=Header(...)): return Response(get_session(x_session).data,media_type='application/pdf')
 
+@app.get('/api/document/page/{page}/pdf')
+def page_pdf(page:int,x_session:str=Header(...)):
+    data=get_session(x_session).data
+    with fitz.open(stream=data,filetype='pdf') as doc,fitz.open() as preview:
+        if not 0<=page<len(doc):raise ValueError('Invalid page.')
+        preview.insert_pdf(doc,from_page=page,to_page=page,links=False,widgets=False)
+        return Response(preview.tobytes(garbage=3,deflate=True),media_type='application/pdf')
+
 @app.get('/api/document/page/{page}/text')
-def text(page:int,x_session:str=Header(...)):
+def text(page:int,x_session:str=Header(...),words_only:bool=False):
     s=get_session(x_session)
-    if not 0<=page<len(describe(s)['pages']): raise ValueError('Invalid page.')
-    return {'spans':content.inspect(s.data,page),'words':inspect_words(s.data,page)}
+    with s.lock:
+        words=page_words(s,page)
+        if words_only:return {'words':words}
+        return {'spans':content.inspect(s.data,page),'words':words}
 
 @app.get('/api/document/page/{page}/shapes')
 def shapes(page:int,x_session:str=Header(...)):
@@ -181,7 +214,9 @@ async def operation(body:OperationBody,x_session:str=Header(...)):
     body=body.model_dump(); s=get_session(x_session)
     def work():
         with s.lock:
-            data=engine.apply(s.data,body['operation'],body.get('args',{})); commit(s,data); return describe(s)
+            args=body.get('args',{})
+            targets=page_words(s,int(args.get('page',0))) if body['operation']=='replace-word' else None
+            data=engine.apply(s.data,body['operation'],args,word_targets=targets); commit(s,data); return describe(s)
     return await run_in_threadpool(work)
 
 @app.post('/api/document/file-operation')
@@ -198,7 +233,9 @@ def history(direction:str,x_session:str=Header(...)):
     with s.lock:
         target=s.cursor+(-1 if direction=='undo' else 1 if direction=='redo' else 0)
         if direction not in ('undo','redo') or not 0<=target<len(s.versions): raise ValueError('No history in that direction.')
-        s.cursor=target; return describe(s)
+        with storage_lock:
+            clear_analysis(s);s.cursor=target
+        return describe(s)
 
 @app.post('/api/document/export')
 async def export(body:ExportBody,x_session:str=Header(...)):

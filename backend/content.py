@@ -102,7 +102,7 @@ def runs(pdf,page_index):
 def inspect(data,page_index):
     with pikepdf.open(io.BytesIO(data)) as pdf, fitz.open(stream=data,filetype='pdf') as doc:
         _,items=runs(pdf,page_index); page=doc[page_index]; spans=[]
-        for block in page.get_text('dict')['blocks']:
+        for block in page.get_text('dict',flags=fitz.TEXTFLAGS_DICT & ~fitz.TEXT_PRESERVE_IMAGES)['blocks']:
             for line in block.get('lines',[]):
                 for span in line['spans']:
                     spans.append({**span,'direction':line['dir']})

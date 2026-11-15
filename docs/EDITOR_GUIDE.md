@@ -1,10 +1,10 @@
 # Edit an existing word and select shapes
 
-Release `word-shapes-2`. Open the current Render editor, refresh, then choose **Try sample PDF**. This is a generated real PDF sent through the same upload, font inspection and PDF-processing engine as an uploaded document.
+Release `fast-words-3`. Open the current Render editor, refresh, then choose **Try sample PDF**. This is a generated real PDF sent through the same upload, font inspection and PDF-processing engine as an uploaded document.
 
 1. **Edit existing text** is directly above the PDF. The adjacent count reports how many words can be edited.
 2. Click **brown** in the sample's first sentence. Only that word appears in the on-page field.
-3. Type **red**, then press Enter or Save. Download PDF writes the modified original PDF content.
+3. Type **red**, then press Enter or Save. Tab saves and moves to the next word; Shift+Tab moves back. The Previous word / Next word buttons provide the same flow on touch screens. Moving past unchanged words requires no PDF rewrite. Download PDF also saves the current word draft before exporting; an invalid draft blocks the download and stays in the editor.
 4. Open **Shapes**, choose **Ellipse**, then drag across the blank part of the page.
 5. The ellipse is selected automatically. Drag the ellipse to move it, or drag the corner handle to resize it.
 6. Change Border, Fill or Width, then choose **Apply style**. **Delete shape**, Undo and Redo change actual document versions.

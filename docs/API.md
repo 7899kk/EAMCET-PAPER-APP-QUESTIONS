@@ -10,6 +10,7 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | POST | `/images-to-pdf` | Multipart repeated `files`; returns a new document token |
 | GET | `/document` | Page dimensions/rotation, metadata, bytes, undo/redo availability |
 | GET | `/document/pdf` | Current actual PDF bytes |
+| GET | `/document/page/{page}/pdf` | Lightweight one-page preview; full exports still contain the whole edited document |
 | GET | `/document/page/{zero-based-page}/text` | Rendered spans plus word targets with bounding boxes, string IDs, source parts and `editable` flags / reasons |
 | GET | `/document/page/{page}/thumbnail` | PNG thumbnail |
 | GET | `/document/page/{page}/shapes` | Supported Square/Circle/Line annotations with IDs, geometry, style and editability |
@@ -22,6 +23,8 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | DELETE | `/document` | Remove session/history from memory |
 
 Every page index is **zero-based**. Coordinates are PDF points (72 pt = one inch) measured from the rendered page's top-left. New content generally requires rotation 0°. Each operation is atomic: failures preserve the preceding PDF version. Up to 12 versions are retained. Document info responses include `undo` and `redo` flags.
+
+The text endpoint accepts `?words_only=true` to skip legacy span detection. Current-revision word detection is cached per session (at most four pages / 4 MB of estimated analysis memory, counted in the global memory budget). Successful edits and undo/redo invalidate it; close and expiry discard it. A word edit validates against these server-produced targets under the same session lock. No client-supplied cache can bypass validation.
 
 ## JSON operations
 

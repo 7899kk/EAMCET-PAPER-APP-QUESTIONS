@@ -11,6 +11,10 @@
 .word-editor-footer{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:7px}
 .word-editor-footer>span{font-size:8px;color:#899b8e}
 .word-editor-footer .button{padding:6px 9px;font-size:10px}
+.word-navigation{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #e0e8dc;margin-top:8px;padding-top:6px}
+.word-navigation button{display:flex;align-items:center;gap:3px;color:#176448;font-size:10px;min-height:30px;padding:3px}
+.thumbnail-preview{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+@media(max-width:600px){.word-navigation button{min-height:36px}.word-editor-footer>span{font-size:7px}}
 .fit-word-option{display:flex;align-items:flex-start;gap:7px;margin-top:15px;color:#7a8d70;font-size:10px;line-height:1.6}
 .fit-word-option input{accent-color:#197454;margin:2px 0 0}
 @media(max-width:850px){.editing:has(.word-editor) .properties-panel{display:none}.word-editor-footer>span{font-size:8px}}
@@ -50,3 +54,4 @@
 @media(max-width:850px){.shapes-mode .workspace{grid-template-columns:130px minmax(0,1fr)}.editing-guide{padding:7px 12px;gap:8px}.editing-guide>span{font-size:10px}.shape-controls{padding:8px 12px}}
 @media(max-width:600px){.edit-existing-button{font-size:11px;padding:8px}.editing-guide{gap:6px}.editing-guide>span{flex:1;min-width:85px;font-size:9px}.editor-help-button{font-size:9px}.shape-controls{padding:7px 10px;gap:7px}.shape-types{gap:4px}.shape-types button{font-size:9px;padding:7px 5px;gap:4px}.shape-types svg{width:13px}.shape-controls>p{font-size:9px}.shape-style{gap:8px}.shape-resize{width:20px;height:20px;right:-10px;bottom:-10px}.shape-hit{inset:-7px}.sample-button{font-size:11px}.canvas-top>span{max-width:calc(100% - 64px)}.canvas-top{height:auto;min-height:40px;padding-top:6px;padding-bottom:6px}.tool{font-size:9px;color:#53684e}.editing.shapes-mode .workspace{display:flex}}
 @media(max-width:850px){.word-props-trigger,.word-props-back{display:inline-flex}.word-props-trigger{margin-left:auto}.editing.word-properties-open:has(.word-editor) .properties-panel{display:flex}.editing.word-properties-open .word-editor{display:none}}
+@media(max-width:850px){.editing:not(.word-properties-open):has(.word-editor) .properties-panel{display:none}}
