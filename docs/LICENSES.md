@@ -66,3 +66,9 @@ Native wheels also incorporate libraries under their own terms (for example qpdf
 ## Obligations
 
 Free use does not remove licence obligations. Preserve attribution and licence text, keep font-specific terms, and provide corresponding app/engine source and build instructions when required by AGPL distribution or network use. Do not incorporate proprietary Stirling components under the root MIT label. No proprietary code or paid API is required by this application. Upgrading the engine or adding conversions requires another licence check.
+
+### Inline font handling
+
+The browser-compatible default set now also includes unmodified Liberation Serif Regular/Bold and Liberation Mono Regular/Bold from the installed `fonts-liberation` distribution. Their SIL OFL-1.1 terms and copyright are retained as `backend/fonts/LIBERATION-DISTRO-COPYRIGHT`, alongside `LICENSE_LIBERATION`; reserved names and font bytes are unchanged. These replace raw Type 1 defaults for browser font decoding. Existing Foxit notices/assets remain retained for prior compatibility.
+
+Fonts extracted from a user's uploaded PDF are not application assets: they remain per-document/session data and are copied only into that user's edited PDF and authenticated browser font response. They are never committed to this repository. Unsupported font formats/shaping are left read-only rather than misrepresented as a successful edit.

@@ -57,7 +57,7 @@ The text endpoint accepts `?words_only=true` to skip legacy span detection. Curr
 
 Word IDs identify source instruction/character ranges; IDs and the expected `original` word must come from the latest response. Word edits replace that occurrence only, preserve adjacent operands/kerning and positions, and support repeated words and compatible words split across instructions. A blank replacement removes the word while keeping its layout space. Fit condenses a longer replacement to the original word width. No paragraph reflow is performed.
 
-That optional fit behaviour belongs to the legacy `replace-word` endpoint. The current UI uses `replace-readable`: natural-size words/phrases when they fit, otherwise a wrapped text layer. Existing encoded source characters are removed, not covered. Font fallback and placement in free space are reported. Full paragraph reflow is unsupported. If there is no space on the page, replacement fails atomically. Responses that create/select a managed object include `active_layer`, and may include a `notice`. This metadata is persisted in the object's Form XObject, not a separate permanent server database.
+That optional fit behaviour belongs to the legacy `replace-word` endpoint. The legacy word UI used `replace-readable`: natural-size words/phrases when they fit, otherwise a wrapped text layer. Existing encoded source characters are removed, not covered. Font fallback and placement in free space are reported. Full paragraph reflow is unsupported. If there is no space on the page, replacement fails atomically. Responses that create/select a managed object include `active_layer`, and may include a `notice`. This metadata is persisted in the object's Form XObject, not a separate permanent server database.
 
 Image file operations also create managed layers. Use `layer-update` to move/resize and `layer-delete` to remove them. Cropping is reflected in layer coordinates. Redaction removes intersected managed layers completely, including their private text editing metadata, before redacting the original page content; this can remove more than the exact rectangle. Undo retains prior versions until close/expiry.
 
@@ -93,3 +93,14 @@ curl -H 'X-Session: TOKEN' -H 'Content-Type: application/json' \
 ```
 
 Error JSON uses `detail`. Common codes: 422 invalid/unsupported operation or file/password; 404 expired/missing session; 413 oversized upload; 403 cross-origin write; 503 exhausted global memory. Request model errors use FastAPI's standard detail array. No permissive cross-origin API access is enabled. The local app does not authenticate users beyond possession of a session token.
+
+## Inline paragraph editor (current UI)
+
+- `GET /document/page/{page}/blocks`: current paragraph targets, source font/style, area, editability and reason.
+- `GET /document/page/{page}/font?block=ID`: authenticated original embedded font bytes for in-page typing. `block=new` uses the bundled free Sans font. No document font is published as a site asset.
+- `GET /document/page/{page}/pdf?exclude_block=ID`: temporary preview without the selected source paragraph, for live DOM typing without doubled glyphs. Does not commit changes.
+- `POST /document/inline-edit`: `{ "operation":"replace-block", "args":{"page":0,"id":"ID","original":"current text","text":"replacement"} }`. Validates the current source under the session lock, removes original source characters and inserts vector text with the original embedded font in the same frame. Returns document info and `inline_block`. New text uses `id:"new"` and a `rect`.
+
+Text wraps in its original frame and reduces size only as needed, to 65% of the original with a 4 pt minimum. Overflow and stale-source errors leave the saved PDF unchanged. Later edits retain the original maximum size and can grow back after shortening. Font/structure limitations are returned explicitly. Autosave is a frontend behavior; this endpoint commits actual PDF bytes. Full-page reflow is unsupported.
+
+Layers also return supported direct native raster image occurrences with `image:` IDs. `layer-delete` removes that occurrence. `layer-update` moves/resizes it by converting to a managed rectangular layer; original clipping is not preserved. Other uses of the same image resource remain unchanged.

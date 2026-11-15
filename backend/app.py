@@ -15,7 +15,7 @@ from . import engine,content
 from .words import inspect_words
 from .shapes import inspect_shapes
 from .sample import sample_pdf
-from . import layers,ocr
+from . import layers,ocr,blocks,images
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
@@ -79,6 +79,16 @@ def total_memory(): return sum(sum(len(v) for v in s.versions)+s.analysis_bytes 
 
 def clear_analysis(s):
     s.word_cache.clear();s.analysis_bytes=0
+
+def page_blocks(s,page):
+    key=('blocks',page)
+    if key in s.word_cache:return s.word_cache[key][0]
+    result=blocks.inspect_blocks(s.data,page,page_words(s,page));cost=len(json.dumps(result).encode())*4
+    with storage_lock:
+        while s.word_cache and (len(s.word_cache)>=4 or s.analysis_bytes+cost>4*1024*1024):
+            _,(_,removed)=s.word_cache.popitem(last=False);s.analysis_bytes-=removed
+        if cost<=4*1024*1024 and total_memory()+cost<=MAX_MEMORY:s.word_cache[key]=(result,cost);s.analysis_bytes+=cost
+    return result
 
 def page_words(s,page):
     """Caller holds s.lock. Cache only current-revision words within memory limits."""
@@ -174,7 +184,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'readable-layers-4','editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'inline-paragraphs-5','inline_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -209,8 +219,11 @@ def info(x_session:str=Header(...)): return describe(get_session(x_session))
 def pdf(x_session:str=Header(...)): return Response(get_session(x_session).data,media_type='application/pdf')
 
 @app.get('/api/document/page/{page}/pdf')
-def page_pdf(page:int,x_session:str=Header(...)):
-    data=get_session(x_session).data
+def page_pdf(page:int,x_session:str=Header(...),exclude_block:str=''):
+    s=get_session(x_session);data=s.data
+    if exclude_block:
+        with s.lock:
+            data=s.data;block=blocks.find_block(data,page,exclude_block,page_blocks(s,page));data=blocks.remove_block(data,page,block,page_words(s,page))
     with fitz.open(stream=data,filetype='pdf') as doc,fitz.open() as preview:
         if not 0<=page<len(doc):raise ValueError('Invalid page.')
         preview.insert_pdf(doc,from_page=page,to_page=page,links=False,widgets=False)
@@ -231,7 +244,37 @@ def shapes(page:int,x_session:str=Header(...)):
 @app.get('/api/document/page/{page}/layers')
 def layer_list(page:int,x_session:str=Header(...)):
     s=get_session(x_session)
-    return {'layers':layers.inspect_layers(s.data,page)}
+    return {'layers':layers.inspect_layers(s.data,page)+images.inspect_images(s.data,page)}
+
+@app.get('/api/document/page/{page}/blocks')
+def text_blocks(page:int,x_session:str=Header(...)):
+    s=get_session(x_session)
+    with s.lock:return {'blocks':page_blocks(s,page)}
+
+@app.get('/api/document/page/{page}/font')
+def block_font(page:int,block:str,x_session:str=Header(...)):
+    s=get_session(x_session)
+    with s.lock:
+        if block=='new':
+            face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
+            return Response(layers.font_buffer('helv'),media_type='application/octet-stream',headers={'X-Font-Ascender':str(face.ascender),'X-Font-Descender':str(face.descender)})
+        selected=blocks.find_block(s.data,page,block,page_blocks(s,page));data=blocks.font_for_block(s.data,page,selected)
+        return Response(data,media_type='application/octet-stream')
+
+@app.post('/api/document/inline-edit')
+async def inline_edit(body:OperationBody,x_session:str=Header(...)):
+    s=get_session(x_session);args=body.args;page=int(args.get('page',0))
+    def work():
+        with s.lock:
+            ensure_idle(s)
+            if args.get('id')=='new':
+                face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
+                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':'helv','font_label':'Sans','ascender':face.ascender,'descender':face.descender,'fixed_frame':True})
+                block=next(b for b in reversed(blocks.inspect_blocks(result,page)) if b['kind']=='layer')
+            else:result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))
+            commit(s,result)
+            return {**describe(s),'inline_block':block}
+    return await run_in_threadpool(work)
 
 @app.post('/api/document/ocr')
 async def start_ocr(body:ExportBody,x_session:str=Header(...)):

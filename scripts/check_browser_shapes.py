@@ -119,4 +119,7 @@ async def main():
    await context.close()
   await browser.close()
 
-if __name__=='__main__':asyncio.run(main())
+if __name__=='__main__':
+ import runpy
+ print('Running the current inline UI regression; legacy popup interactions were replaced.',flush=True)
+ runpy.run_path(str(Path(__file__).resolve().parent/'check_browser_inline.py'),run_name='__main__')

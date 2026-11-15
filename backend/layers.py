@@ -11,7 +11,7 @@ import pymupdf as fitz
 from PIL import Image
 
 FONTS={'helv','hebo','tiro','tibo','cour','cobo'}
-FONT_FILES={'helv':'LiberationSans-Regular.ttf','hebo':'LiberationSans-Bold.ttf','tiro':'FoxitSerif.pfb','tibo':'FoxitSerifBold.pfb','cour':'FoxitFixed.pfb','cobo':'FoxitFixedBold.pfb'}
+FONT_FILES={'helv':'LiberationSans-Regular.ttf','hebo':'LiberationSans-Bold.ttf','tiro':'LiberationSerif-Regular.ttf','tibo':'LiberationSerif-Bold.ttf','cour':'LiberationMono-Regular.ttf','cobo':'LiberationMono-Bold.ttf'}
 
 @lru_cache(maxsize=6)
 def font_buffer(name):return (Path(__file__).with_name('fonts')/FONT_FILES[name]).read_bytes()
@@ -28,12 +28,12 @@ def normalize_space_map(doc,xref):
         normalized=re.sub(rb'(?im)^(<[0-9a-f]+>[ \t]+)<00a0>[ \t]*$',rb'\g<1><0020>',raw)
         if normalized!=raw:doc.update_stream(stream,normalized)
 
-def draw_text(page,rect,text,font,size,color=(0,0,0)):
+def draw_text(page,rect,text,font,size,color=(0,0,0),font_bytes=None,lineheight=1.2):
     # Embed licensed Unicode-capable fonts. Base-14's simple encoding
     # silently substituted question marks for curly quotes and em dashes.
-    xref=page.insert_font(fontname='FolioText',fontbuffer=font_buffer(font))
+    xref=page.insert_font(fontname='FolioText',fontbuffer=font_bytes or font_buffer(font))
     normalize_space_map(page.parent,xref)
-    return page.insert_textbox(rect,text,fontname='FolioText',fontsize=size,color=color,lineheight=1.2)
+    return page.insert_textbox(rect,text,fontname='FolioText',fontsize=size,color=color,lineheight=lineheight)
 
 def rgb(color):
     if not isinstance(color,str) or not re.fullmatch(r'#[0-9a-fA-F]{6}',color):raise ValueError('Invalid colour.')
@@ -46,24 +46,44 @@ def checked_rect(page,values):
     if page.rotation:raise ValueError('Rotate this page to 0° before editing layers.')
     return rect
 
-def text_style(args):
+def text_style(args,font_bytes=None):
     text=str(args.get('text',''))
-    if not text.strip() or len(text)>4000:raise ValueError('Enter text, up to 4000 characters. Spaces and new lines are supported.')
+    if not text.strip() or len(text)>6000:raise ValueError('Enter text, up to 6000 characters. Spaces and new lines are supported.')
     if any(ord(c)<32 and c not in '\n\t' for c in text):raise ValueError('Unsupported control character.')
     try:text.encode('cp1252')
     except UnicodeError:raise ValueError('Text boxes currently support Western Latin characters. Other scripts need a compatible shaping/font engine.')
     font=args.get('font','helv');size=float(args.get('size',16))
-    if font not in FONTS:raise ValueError('Choose one of the available text-box fonts.')
+    if font not in FONTS and not(font=='source' and font_bytes):raise ValueError('Choose an available font.')
     if not math.isfinite(size) or not 4<=size<=144:raise ValueError('Font size must be 4–144 pt.')
+    if font_bytes:
+        face=fitz.Font(fontbuffer=font_bytes)
+        missing=next((c for c in text if not c.isspace() and not face.has_glyph(ord(c))),None)
+        if missing:raise ValueError(f'The original embedded font lacks {missing!r}. Remove that character or choose another font under Layers.')
     return text.replace('\t','    '),font,size,rgb(args.get('color','#263449'))
 
-def text_height(text,width,size,font):
+def text_height(text,width,size,font,font_bytes=None,lineheight=1.2):
     # Use MuPDF's actual layout result, not a character-count approximation.
     with fitz.open() as doc:
         page=doc.new_page(width=max(width,10),height=16000)
-        remaining=draw_text(page,(0,0,width,16000),text,font,size)
+        remaining=draw_text(page,(0,0,width,16000),text,font,size,font_bytes=font_bytes,lineheight=lineheight)
         if remaining<0:raise ValueError('This text needs more room.')
         return max(size*1.5,16000-remaining+2)
+
+def frame_lines(text,width,size,face):
+    lines=[]
+    for paragraph in text.split('\n'):
+        line=''
+        for token in re.findall(r'\S+|[^\S\n]+',paragraph):
+            if face.text_length(line+token,fontsize=size)<=width+.01:line+=token;continue
+            if line.strip():lines.append(line.rstrip());line=''
+            token=token.lstrip()
+            for char in token:
+                if face.text_length(line+char,fontsize=size)>width+.01:
+                    if not line:raise ValueError('This area is too narrow for the selected font.')
+                    lines.append(line);line=''
+                line+=char
+        lines.append(line.rstrip())
+    return lines
 
 def _objects(pdf,page_index):
     page=pdf.pages[page_index]
@@ -105,27 +125,44 @@ def remove(data,page_index,identity):
         objects=pikepdf.Dictionary(page.Resources.XObject);del objects[name];page.Resources.XObject=objects
         return _save(pdf)
 
-def add(data,page_index,args,extra=None):
+def add(data,page_index,args,extra=None,font_bytes=None):
     kind=args.get('type','text');meta={'schema':1,'id':args.get('id') or uuid.uuid4().hex,'type':kind}
     with fitz.open(stream=data,filetype='pdf') as doc,fitz.open() as source:
         if not 0<=page_index<len(doc):raise ValueError('Invalid page.')
         page=doc[page_index]
         if page.rotation:raise ValueError('Rotate this page to 0° before placing content.')
         if kind=='text':
-            text,font,size,color=text_style(args)
+            text,font,size,color=text_style(args,font_bytes);lineheight=float(args.get('lineheight',1.2))
+            if not 1<=lineheight<=2.5:raise ValueError('Invalid line spacing.')
             if 'rect' in args:rect=checked_rect(page,args['rect'])
             else:
                 x=float(args.get('x',52));y=float(args.get('y',72));width=min(float(args.get('width',320)),page.rect.width-x-12)
                 if width<20:raise ValueError('Click further from the right edge to leave room for text.')
                 height=text_height(text,width,size,font)
                 rect=checked_rect(page,[x,y,x+width,y+height])
-            height=text_height(text,rect.width,size,font)
-            if height>rect.height+.1:
+            height=text_height(text,rect.width,size,font,font_bytes,lineheight)
+            if args.get('fixed_frame'):
+                maximum=float(args.get('max_size',size));low=max(4,maximum*.65);high=maximum
+                face=fitz.Font(fontbuffer=font_bytes or font_buffer(font));asc=float(args.get('ascender',face.ascender));desc=float(args.get('descender',face.descender))
+                def fits(value):return (asc-desc)*value+max(0,len(frame_lines(text,rect.width,value,face))-1)*lineheight*value<=rect.height+.015
+                if not fits(low):raise ValueError('This paragraph has more text than its area can hold. Shorten it or resize its text layer; your draft is preserved.')
+                for _ in range(10):
+                    candidate=(low+high)/2
+                    if fits(candidate):low=candidate
+                    else:high=candidate
+                size=maximum if fits(maximum) else low
+            elif height>rect.height+.1:
                 # Resizing a text layer reflows at its font size, never stretches glyphs.
                 rect=checked_rect(page,[rect.x0,rect.y0,rect.x1,rect.y0+height])
             p=source.new_page(width=rect.width,height=rect.height)
-            if draw_text(p,p.rect,text,font,size,color)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
+            if args.get('fixed_frame'):
+                xref=p.insert_font(fontname='FolioText',fontbuffer=font_bytes or font_buffer(font));normalize_space_map(p.parent,xref)
+                for i,line in enumerate(frame_lines(text,rect.width,size,face)):
+                    if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
+            elif draw_text(p,p.rect,text,font,size,color,font_bytes,lineheight)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
             meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449')})
+            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender'):
+                if key in args:meta[key]=args[key]
         elif kind=='image':
             rect=checked_rect(page,args['rect'])
             if not extra:raise ValueError('Choose an image.')
@@ -152,13 +189,28 @@ def add(data,page_index,args,extra=None):
         result=doc.tobytes(garbage=4,deflate=True)
     with pikepdf.open(io.BytesIO(result)) as pdf:
         pdf.pages[page_index].Resources.XObject['/'+name].FolioLayer=pikepdf.String(json.dumps(meta,separators=(',',':')))
+        if font_bytes:
+            if len(font_bytes)>5*1024*1024:raise ValueError('Embedded font exceeds the supported size.')
+            pdf.pages[page_index].Resources.XObject['/'+name].FolioFont=pdf.make_stream(font_bytes)
         return _save(pdf)
+
+def font_for_layer(data,page_index,identity):
+    with pikepdf.open(io.BytesIO(data)) as pdf:
+        item=next((o for o in _objects(pdf,page_index) if o[2]['id']==identity),None)
+        if not item:raise ValueError('This text layer no longer exists.')
+        _,obj,meta=item
+        return obj.FolioFont.read_bytes() if '/FolioFont' in obj else font_buffer(meta['font'])
 
 def update(data,page_index,args):
     old=next((m for m in inspect_layers(data,page_index) if m['id']==args.get('id')),None)
     if not old:raise ValueError('This layer no longer exists. Select it again.')
     merged={**old,**{k:v for k,v in args.items() if k in ('rect','text','font','size','color','width','opacity')}}
-    if old['type']=='text' and any(merged[k]!=old[k] for k in ('text','font','size')) and merged['rect']==old['rect']:
+    if old['type']=='text' and merged['font']!=old['font'] and merged['font'] in FONTS:
+        face=fitz.Font(fontbuffer=font_buffer(merged['font']))
+        merged.update(font_label={'helv':'Sans','hebo':'Sans Bold','tiro':'Serif','tibo':'Serif Bold','cour':'Monospace','cobo':'Monospace Bold'}[merged['font']],ascender=face.ascender,descender=face.descender)
+    font_bytes=font_for_layer(data,page_index,old['id']) if old.get('font')=='source' and merged.get('font')=='source' else None
+    if 'size' in args and old.get('fixed_frame'):merged['max_size']=args['size']
+    if old['type']=='text' and not old.get('fixed_frame') and any(merged[k]!=old[k] for k in ('text','font','size')) and merged['rect']==old['rect']:
         text,font,size,_=text_style(merged);original=fitz.Rect(old['rect'])
         height=max(original.height,text_height(text,original.width,size,font))
         with fitz.open(stream=data,filetype='pdf') as doc:
@@ -188,4 +240,4 @@ def update(data,page_index,args):
         merged['width']=max(.5,min(60,old['width']*min(b.width/a.width,b.height/a.height)))
     elif old['type']=='brush' and merged['width']!=old['width']:
         merged.pop('rect',None)
-    return add(remove(data,page_index,old['id']),page_index,merged)
+    return add(remove(data,page_index,old['id']),page_index,merged,font_bytes=font_bytes)

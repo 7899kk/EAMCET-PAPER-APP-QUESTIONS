@@ -5,7 +5,7 @@ from PIL import Image
 from .content import replace,inspect
 from .words import replace_word
 from . import shapes
-from . import layers
+from . import layers,images
 from .readable import replace_readable
 
 MAX_PAGES=300
@@ -52,8 +52,8 @@ def apply(data,op,args,extra=None,word_targets=None):
     if op in ('text','stamp'):return layers.add(data,page_index,{**args,'type':'text'})
     if op=='image':return layers.add(data,page_index,{**args,'type':'image'},extra)
     if op=='brush':return layers.add(data,page_index,{**args,'type':'brush'})
-    if op=='layer-update':return layers.update(data,page_index,args)
-    if op=='layer-delete':return layers.remove(data,page_index,str(args['id']))
+    if op=='layer-update':return images.change(data,page_index,args) if str(args.get('id','')).startswith('image:') else layers.update(data,page_index,args)
+    if op=='layer-delete':return images.change(data,page_index,args,True) if str(args.get('id','')).startswith('image:') else layers.remove(data,page_index,str(args['id']))
     if op=='redact':
         # Remove intersected managed objects completely, including their private
         # editing metadata. Otherwise redacted text could survive in /FolioLayer.

@@ -56,6 +56,14 @@
 @media(max-width:850px){.word-props-trigger,.word-props-back{display:inline-flex}.word-props-trigger{margin-left:auto}.editing.word-properties-open:has(.word-editor) .properties-panel{display:flex}.editing.word-properties-open .word-editor{display:none}}
 @media(max-width:850px){.editing:not(.word-properties-open):has(.word-editor) .properties-panel{display:none}}
 .word-editor>textarea{width:100%;resize:vertical;min-height:76px;max-height:180px;padding:8px;border:1px solid #8ab59c;border-radius:5px;color:#234c39;font-size:16px;line-height:1.4;background:#fbfdf9}
+.paragraph-hit{position:absolute;z-index:7;cursor:text;border:0;background:transparent;outline:0}
+.paragraph-readonly{cursor:default}
+.inline-text{position:absolute;z-index:22;border:0;outline:0;background:transparent;padding:0;margin:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;box-sizing:border-box;cursor:text;caret-color:currentColor;font-kerning:none;font-variant-ligatures:none}
+.inline-text.inline-error{outline:1px solid #bc5846;outline-offset:3px}
+.inline-default .properties-panel{display:none}.inline-default .workspace{grid-template-columns:195px minmax(0,1fr)}
+@media(max-width:1100px){.inline-default .workspace{grid-template-columns:155px minmax(0,1fr)}}
+@media(max-width:850px){.inline-default .workspace{grid-template-columns:130px minmax(0,1fr)}}
+@media(max-width:600px){.editing.inline-default .workspace{display:flex}}
 .object-box{position:absolute;z-index:6;cursor:move;touch-action:none}
 .object-hit{position:absolute;inset:0;border:1px solid transparent;background:transparent;width:100%;height:100%;cursor:move;touch-action:none}
 .object-hit:hover{border:1px dashed #318b68;background:#278d5810}
