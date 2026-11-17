@@ -36,7 +36,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   if(current.current?.id===block.id&&!current.current.closing)return;
   if(!await save(true))return;
   setError('');
-  const next={...block,page,editSession:++sequence.current,closing:false};current.current=next;draft.current=block.text;saved.current=block.text;click.current=point;setMasked(block.id==='new');setFace(null);setActive(next);setStatus('Preparing text…');
+  const next={...block,size:block.max_size||block.size,page,editSession:++sequence.current,closing:false};current.current=next;draft.current=block.text;saved.current=block.text;click.current=point;setMasked(block.id==='new');setFace(null);setActive(next);setStatus('Preparing text…');
  };
  const createAt=(point,size=16,color='#263449')=>activate({id:'new',kind:'new',text:'',rect:[point.x,point.y,Math.min(point.x+320,point.width-12),Math.min(point.y+110,point.height-12)],font:'Sans',size,color,lineheight:1.2,ascender:1.05,descender:-.3,editable:true});
  useEffect(()=>{
@@ -64,7 +64,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  const input=()=>{
   const el=element.current,a=current.current;draft.current=el?.innerText.replace(/\r/g,'').replace(/\t/g,'    ').replace(/\u00a0/g,' ')||'';
-  if(a){a.error=null;const ratio=Number(el.dataset.zoom),max=(a.max_size||a.size)*ratio,min=Math.max(4*ratio,max*.65),target=(a.rect[3]-a.rect[1])*ratio;let size=max;el.style.fontSize=size+'px';for(let i=0;i<16&&el.scrollHeight>target+2&&size>min;i++){size=Math.max(min,size-.35*ratio);el.style.fontSize=size+'px'}}
+  if(a){a.error=null;el.style.fontSize=(a.max_size||a.size)*Number(el.dataset.zoom)+'px'}
   setStatus('Editing…');clearTimeout(timer.current);timer.current=setTimeout(()=>save(),550);
  };
  const revert=()=>{clearTimeout(timer.current);setError('');draft.current=saved.current;if(element.current)element.current.textContent=saved.current;if(current.current)current.current.error=null;finish()};
@@ -75,6 +75,6 @@ export function InlineText({model:m,zoom,canvasMask}) {
  const a=m.active,show=a&&m.face&&m.masked&&!(a.closing&&canvasMask==='');
  return <>
   {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
-  {a&&<div ref={m.element} data-zoom={zoom} role="textbox" aria-label="Edit text directly on PDF" aria-multiline="true" contentEditable={!a.closing} suppressContentEditableWarning spellCheck={false} className={'inline-text '+(a.error?'inline-error':'')} style={{left:a.rect[0]*zoom,top:(a.rect[1]+((a.ascender-a.descender-a.lineheight)*a.size)/2)*zoom,width:(a.rect[2]-a.rect[0])*zoom,minHeight:(a.rect[3]-a.rect[1])*zoom,fontFamily:m.face||'sans-serif',fontSize:a.size*zoom,lineHeight:a.lineheight,color:a.color,opacity:show?1:0,pointerEvents:a.closing?'none':'auto'}} onInput={m.input} onPointerDown={e=>e.stopPropagation()} onBlur={()=>m.finish()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();m.revert()}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();m.finish()}}} onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain').replace(/\t/g,'    '))}}/>}
+  {a&&<div ref={m.element} data-zoom={zoom} role="textbox" aria-label="Edit text directly on PDF" aria-multiline="true" contentEditable={!a.closing} suppressContentEditableWarning spellCheck={false} className={'inline-text '+(a.error?'inline-error':'')} style={{left:a.rect[0]*zoom,top:(a.rect[1]+((a.ascender-a.descender-a.lineheight)*a.size)/2)*zoom,width:((a.flow_rect||a.rect)[2]-a.rect[0])*zoom,minHeight:(a.rect[3]-a.rect[1])*zoom,maxHeight:Math.max(a.rect[3]-a.rect[1],(a.flow_rect||a.rect)[3]-a.rect[1])*zoom,overflowY:'auto',fontFamily:m.face||'sans-serif',fontSize:(a.max_size||a.size)*zoom,lineHeight:a.lineheight,color:a.color,opacity:show?1:0,pointerEvents:a.closing?'none':'auto'}} onInput={m.input} onPointerDown={e=>e.stopPropagation()} onBlur={()=>m.finish()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();m.revert()}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();m.finish()}}} onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain').replace(/\t/g,'    '))}}/>}
  </>;
 }

@@ -1,12 +1,14 @@
 # Direct PDF editing
 
-Release `inline-paragraphs-5`.
+Release `fixed-size-flow-6`.
 
 ## Click text and type
 
 Upload a PDF, choose **Edit text**, and click a supported paragraph. Type directly on the page. There are no persistent word underlines and no floating text-entry/Save dialog. Changes save automatically after a short typing pause. Download, changing pages and switching tools wait for pending text changes before continuing.
 
-The paragraph stays in its original area. Words wrap inside that area, and the font size gently reduces when needed (down to 65% of the original size, with a 4 pt floor). Shortening the text can restore the original size. The original embedded TrueType/OpenType font, colour and line spacing are retained where supported. Standard fonts without embedded data use the bundled compatible free fonts. Very large additions that cannot fit produce an error and preserve the draft/source rather than covering adjacent content. Escape restores the last saved text; Ctrl/Cmd+Enter finishes editing. Enter inserts a paragraph line break.
+The original font size stays fixed while typing. On a supported single line, following words shift to the right into available space. At the available boundary, words wrap onto the next line. Multiline paragraphs keep their column width and reflow their following lines. The text area grows downward into free space; shortening the text can reduce its height again. No automatic font-size reduction or horizontal squeezing occurs.
+
+The original embedded TrueType/OpenType font, colour, starting position and line spacing are retained where supported. Standard fonts without embedded data use bundled compatible free fonts. Page edges, detected neighbouring text, images, graphics and containing panels limit expansion. If there is no room, saving fails explicitly and preserves your draft and the previous PDF. Resize/move the saved layer, manually choose a smaller size under Layers, or shorten the text. Separate paragraphs/images are not automatically pushed onto another page. Escape restores the last saved text; Ctrl/Cmd+Enter finishes editing. Enter inserts a line break.
 
 During editing, a temporary page preview removes the original paragraph's encoded characters so the live browser text does not overlap its old image. This is not a white rectangle or a raster replacement. On automatic save, the old characters are genuinely removed and a vector text object is written into the same frame. The document is still a real PDF and exported changes survive reopening.
 
@@ -31,3 +33,7 @@ OCR is local, shows progress and supports cancellation. Searchable output preser
 The supplied nine-page guide was tested locally. A phrase on page 2 was changed from “the whole video” to “this type of video.” It stayed in the same paragraph area, kept the Hind font and original colour/size, preserved all embedded images and passed independent PDF text extraction. A pixel comparison found no changes outside that paragraph area. The file and extracted fonts were not committed to source control or uploaded to a third-party editor.
 
 See [testing](TESTING.md) and [API](API.md).
+
+## Sejda comparison
+
+A generated sample was edited and downloaded from Sejda on 2026-11-17. Replacing `feeling` with `Enthusiam` retained its 18 pt size and moved following words right. In this example Sejda did not wrap an excessively long single-line replacement; its export extended beyond the page. Folio keeps the fixed-size behavior and adds safe wrapping instead of off-page clipping. See [comparison observations](../research/SEJDA_REFLOW_CHECK.md).

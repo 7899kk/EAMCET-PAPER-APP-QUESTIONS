@@ -1,6 +1,12 @@
 # Verification report
 
-Release `inline-paragraphs-5`, checked on 2026-11-15.
+Release `fixed-size-flow-6`, checked on 2026-11-17.
+
+## Fixed-size flow checks
+
+`check_browser_reflow.py` passed on desktop 1440×960 and mobile 390×844. It replaces only `feeling` with `Enthusiam` in `I'm feeling happy Today`, checks that the browser and saved PDF keep 18 pt, inserts a longer phrase, checks multiline wrapping within the page, downloads, independently extracts with Poppler, reuploads and edits the saved layer again. No JavaScript errors occurred. Backend assertions also verify that `happy` moves right after the longer word, the starting baseline stays fixed, short edits reduce the expanded height, overflowing drafts do not commit, and other paragraphs remain at their original coordinates.
+
+The generated comparison sample was also edited and downloaded from Sejda. See [actual observations](../research/SEJDA_REFLOW_CHECK.md). Folio adds boundary wrapping to Sejda's observed fixed-size single-line behavior; it does not claim identical full-document layout.
 
 ## Current inline editor checks
 
@@ -8,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **72 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **75 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.

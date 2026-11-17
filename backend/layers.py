@@ -85,6 +85,32 @@ def frame_lines(text,width,size,face):
         lines.append(line.rstrip())
     return lines
 
+def flow_obstacles(page):
+    items=[fitz.Rect(w[:4]) for w in page.get_text('words')]
+    items.extend(fitz.Rect(i['bbox']) for i in page.get_image_info())
+    items.extend(fitz.Rect(d['rect']) for d in page.get_drawings())
+    items.extend(fitz.Rect(a.rect) for a in page.annots() or [])
+    return items
+
+def flow_rect(page,values,expand_width=False,obstacles=None):
+    """Available column area; never shift unrelated page objects."""
+    original=fitz.Rect(values);bounds=page.rect
+    right=max(original.x1,bounds.x1-max(12,min(52,original.x0))) if expand_width else original.x1
+    bottom=max(original.y1,bounds.y1-12)
+    obstacles=flow_obstacles(page) if obstacles is None else obstacles
+    for r in obstacles:
+        # Ignore the paragraph's own glyphs, and respect containing panels.
+        if original.contains(r):continue
+        if r.contains(original):
+            right=min(right,max(original.x1,r.x1-3));bottom=min(bottom,max(original.y1,r.y1-3));continue
+        if expand_width and r.x0>=original.x1-.1 and r.y0<original.y1 and r.y1>original.y0:
+            right=min(right,max(original.x1,r.x0-3))
+    for r in obstacles:
+        if original.contains(r) or r.contains(original):continue
+        if r.x1>original.x0+.1 and r.x0<right-.1 and r.y0>=original.y1-.1:
+            bottom=min(bottom,max(original.y1,r.y0-3))
+    return [original.x0,original.y0,right,bottom]
+
 def _objects(pdf,page_index):
     page=pdf.pages[page_index]
     used={str(i.operands[0]) for i in pikepdf.parse_content_stream(page) if str(i.operator)=='Do'}
@@ -142,15 +168,17 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                 rect=checked_rect(page,[x,y,x+width,y+height])
             height=text_height(text,rect.width,size,font,font_bytes,lineheight)
             if args.get('fixed_frame'):
-                maximum=float(args.get('max_size',size));low=max(4,maximum*.65);high=maximum
+                # Keep the chosen font size. Grow down and wrap; never auto-shrink.
+                size=float(args.get('max_size',size))
+                if not math.isfinite(size) or not 4<=size<=144:raise ValueError('Font size must be 4–144 pt.')
                 face=fitz.Font(fontbuffer=font_bytes or font_buffer(font));asc=float(args.get('ascender',face.ascender));desc=float(args.get('descender',face.descender))
-                def fits(value):return (asc-desc)*value+max(0,len(frame_lines(text,rect.width,value,face))-1)*lineheight*value<=rect.height+.015
-                if not fits(low):raise ValueError('This paragraph has more text than its area can hold. Shorten it or resize its text layer; your draft is preserved.')
-                for _ in range(10):
-                    candidate=(low+high)/2
-                    if fits(candidate):low=candidate
-                    else:high=candidate
-                size=maximum if fits(maximum) else low
+                needed=(asc-desc)*size+max(0,len(frame_lines(text,rect.width,size,face))-1)*lineheight*size
+                available=flow_rect(page,rect)
+                minimum=float(args.get('min_height',rect.height))
+                target=max(minimum,needed)
+                if rect.y0+target>available[3]+.02:
+                    raise ValueError('This paragraph needs more text space at its current font size. Widen or move its layer, or shorten the text; your draft is preserved. Font size was not reduced.')
+                rect=checked_rect(page,[rect.x0,rect.y0,rect.x1,rect.y0+target])
             elif height>rect.height+.1:
                 # Resizing a text layer reflows at its font size, never stretches glyphs.
                 rect=checked_rect(page,[rect.x0,rect.y0,rect.x1,rect.y0+height])
@@ -161,7 +189,7 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                     if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
             elif draw_text(p,p.rect,text,font,size,color,font_bytes,lineheight)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
             meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449')})
-            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender'):
+            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height'):
                 if key in args:meta[key]=args[key]
         elif kind=='image':
             rect=checked_rect(page,args['rect'])
@@ -210,6 +238,7 @@ def update(data,page_index,args):
         merged.update(font_label={'helv':'Sans','hebo':'Sans Bold','tiro':'Serif','tibo':'Serif Bold','cour':'Monospace','cobo':'Monospace Bold'}[merged['font']],ascender=face.ascender,descender=face.descender)
     font_bytes=font_for_layer(data,page_index,old['id']) if old.get('font')=='source' and merged.get('font')=='source' else None
     if 'size' in args and old.get('fixed_frame'):merged['max_size']=args['size']
+    if old.get('fixed_frame') and 'rect' in args and fitz.Rect(args['rect']).height!=fitz.Rect(old['rect']).height:merged['min_height']=fitz.Rect(args['rect']).height
     if old['type']=='text' and not old.get('fixed_frame') and any(merged[k]!=old[k] for k in ('text','font','size')) and merged['rect']==old['rect']:
         text,font,size,_=text_style(merged);original=fitz.Rect(old['rect'])
         height=max(original.height,text_height(text,original.width,size,font))

@@ -2,7 +2,7 @@
 
 A local React + PDF.js workspace backed by real FastAPI, pikepdf/qpdf, PyMuPDF/MuPDF, and optional Tesseract processing. No paid API, subscription, external document service, or fake processing.
 
-**This is a working editor with documented limits, not a complete Sejda replacement.** Short edits change actual PDF text operands. Inline edits remove the original paragraph characters and write readable vector text into the same area, with wrapping/auto-fit. No whiteout hides the old text. See the [current editor guide](docs/EDITOR_GUIDE.md).
+**This is a working editor with documented limits, not a complete Sejda replacement.** Short edits change actual PDF text operands. Inline edits remove the original paragraph characters and write readable vector text into the same area, with fixed-size wrapping. No whiteout hides the old text. See the [current editor guide](docs/EDITOR_GUIDE.md).
 
 ## Start locally for ₹0
 
@@ -35,13 +35,13 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 
 1. Upload a PDF or choose **Try sample PDF**.
 2. Select **Edit text**, click a supported paragraph and type directly on the PDF. No word underlines or floating Save dialog are shown.
-3. Text wraps and auto-fits in the same area; a usable embedded font, colour and line spacing are preserved. Changes save after a short pause.
+3. Text wraps and grows into available space at the same font size; a usable embedded font, colour and line spacing are preserved. Changes save after a short pause.
 4. **Download PDF** waits for pending text edits. Reopen the download to check the result.
 5. **Add text** lets you click a blank area and type directly. **Layers** provides advanced move/resize/font/delete controls for saved text and images.
 6. **Layers** can also select supported original embedded-image occurrences. Deletion affects that occurrence only; moving an original image converts it to a rectangular managed layer, with clipping limitations disclosed.
 7. Undo/redo keeps up to 12 actual PDF versions. Download before closing/restarting the server.
 
-See [the current guide](docs/EDITOR_GUIDE.md) for auto-fit limits, font support, images and OCR. On phones use zoom/Fit width and the page-panel toggle. Native OS keyboards and every browser/font combination are not exhaustively tested.
+See [the current guide](docs/EDITOR_GUIDE.md) for text-flow limits, font support, images and OCR. On phones use zoom/Fit width and the page-panel toggle. Native OS keyboards and every browser/font combination are not exhaustively tested.
 
 ## Implemented
 
@@ -58,7 +58,7 @@ See [the current guide](docs/EDITOR_GUIDE.md) for auto-fit limits, font support,
 
 ## Limitations — read before relying on output
 
-- PDF is not a word processor format. Existing words are matched by their encoded characters and positions. Repeated words/lines and supported words split across multiple PDF text instructions are editable. Rotated or outlined text, text in Form XObjects, overlapping glyphs, mixed styles inside one word, vertical writing, complex scripts/encoding, and unsupported font metrics can remain read-only. The current UI retains the original paragraph area and embedded font, wrapping and reducing size to 65% of the original when needed, with a 4 pt minimum. It cannot push surrounding paragraphs down. Unsupported glyphs and structures remain explicit. Legacy API fit behaviour remains for compatibility only. A word edit preserves the original byte strings and TJ kerning outside the selected range. The replacement uses standard glyph advances, and following text keeps its position.
+- PDF is not a word processor format. Existing words are matched by their encoded characters and positions. Repeated words/lines and supported words split across multiple PDF text instructions are editable. Rotated or outlined text, text in Form XObjects, overlapping glyphs, mixed styles inside one word, vertical writing, complex scripts/encoding, and unsupported font metrics can remain read-only. The current UI retains the original paragraph area and embedded font, wrapping at the same font size and growing downward into available space. It cannot push surrounding paragraphs down. Unsupported glyphs and structures remain explicit. Legacy API fit behaviour remains for compatibility only. A word edit preserves the original byte strings and TJ kerning outside the selected range. The replacement uses standard glyph advances, and following text keeps its position.
 - Scanned PDFs have no text to select. Searchable OCR retains the scan with recognized search text. The separate editable text-copy mode reconstructs recognized words into native PDF text, losing original graphics/fonts/exact formatting. It is an explicitly lossy reconstruction, not editing of scanned pixels. OCR has progress/cancellation and can make recognition errors.
 - Supported direct embedded raster images can be selected, deleted, moved or resized. Moving an original image converts it to a rectangular layer and loses original clipping effects. Nested images and arbitrary existing objects are not all editable. Added images, text boxes and brush highlights have movable/resizable/deletable layers. Arbitrary pre-existing flattened content is not reconstructed as editable objects. Highlights are freehand transparent strokes, not semantic text-range selections. Stamps are text. Signature images are not cryptographic signatures.
 - Word/Excel export, table reconstruction, digital signature validation/signing, form filling, accessibility-tag preservation, complex-script new text, and editing password-restricted documents without the known password are unsupported.

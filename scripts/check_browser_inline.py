@@ -100,7 +100,7 @@ async def main():
    with fitz.open(output) as doc:
     p0=doc[0];assert any(d['stroke_opacity']<.5 for d in p0.get_drawings());assert any(a.type[0]==fitz.PDF_ANNOT_CIRCLE for a in p0.annots())
    assert not errors,errors
-   print(json.dumps({'viewport':'mobile' if mobile else 'desktop','no_underlines_or_save_popup':True,'inline_typing_and_auto_fit':'passed','download_flushes_draft':'passed','page_change_flushes_draft':'passed','add_text_without_popup':'passed','original_image_delete':'passed','browser_errors':errors}),flush=True)
+   print(json.dumps({'viewport':'mobile' if mobile else 'desktop','no_underlines_or_save_popup':True,'inline_typing_and_fixed_font':'passed','download_flushes_draft':'passed','page_change_flushes_draft':'passed','add_text_without_popup':'passed','original_image_delete':'passed','browser_errors':errors}),flush=True)
    await ctx.close()
   # OCR's editable reconstruction uses the same direct editor.
   ctx=await browser.new_context(viewport={'width':1440,'height':960},accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})

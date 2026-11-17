@@ -184,7 +184,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'inline-paragraphs-5','inline_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'fixed-size-flow-6','inline_editing':True,'fixed_size_reflow':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():

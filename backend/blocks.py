@@ -1,4 +1,4 @@
-"""Original paragraph detection and same-frame, font-preserving PDF editing."""
+"""Original paragraph detection and fixed-size, font-preserving PDF editing."""
 import hashlib,io,re
 import pikepdf
 import pymupdf as fitz
@@ -34,7 +34,7 @@ def inspect_blocks(data,page_index,words=None):
         output=[]
         for group in groups:
             box=fitz.Rect(group['rect'])
-            if any(fitz.Rect(o['rect']).contains(box) for o in owned if o['type']=='text'):continue
+            if any((fitz.Rect(o['rect'])+(-.1,-.1,.1,.1)).contains(box) for o in owned if o['type']=='text'):continue
             contained=[w for w in words if box.contains(fitz.Rect(w['bbox'])) or box.intersects(fitz.Rect(w['bbox'])) and fitz.Rect(w['bbox']).get_area() and (box&fitz.Rect(w['bbox'])).get_area()/fitz.Rect(w['bbox']).get_area()>.98]
             # A decorative duplicate/shadow must not leave a second copy behind.
             overlap=any(other is not group and (box&fitz.Rect(other['rect'])).get_area()>.45*min(box.get_area(),fitz.Rect(other['rect']).get_area()) for other in groups)
@@ -50,7 +50,12 @@ def inspect_blocks(data,page_index,words=None):
             leading=(origins[1]-origins[0])/size if len(origins)>1 else 1.2
             output.append({'id':identity,'kind':'native','text':group['text'],'rect':group['rect'],'font':group['style'][0],'size':size,'color':f"#{group['style'][2]:06x}",'lineheight':max(1.,min(2.,leading)),'ascender':group['ascender'],'descender':group['descender'],'editable':editable,'word_ids':[w['id'] for w in contained],'font_resource':resource,'reason':None if editable else 'This styled/overlapping text or font cannot be safely rebuilt as one paragraph.'})
         for item in owned:
-            if item['type']=='text':output.append({'id':'layer:'+item['id'],'kind':'layer','text':item['text'],'rect':item['rect'],'font':item.get('font_label',item['font']),'size':item['size'],'max_size':item.get('max_size',item['size']),'color':item['color'],'lineheight':item.get('lineheight',1.2),'ascender':item.get('ascender',1.05),'descender':item.get('descender',-.3),'editable':item['editable'],'word_ids':[],'layer_id':item['id']})
+            if item['type']=='text':output.append({'id':'layer:'+item['id'],'kind':'layer','text':item['text'],'rect':item['rect'],'font':item.get('font_label',item['font']),'size':item['size'],'max_size':item.get('max_size',item['size']),'color':item['color'],'lineheight':item.get('lineheight',1.2),'ascender':item.get('ascender',1.05),'descender':item.get('descender',-.3),'editable':item['editable'],'word_ids':[],'layer_id':item['id'],'min_height':item.get('min_height',fitz.Rect(item['rect']).height)})
+        obstacles=layers.flow_obstacles(page)
+        for target in output:
+            if target['editable']:
+                single_line=target['kind']=='native' and len(next(g['origins'] for g in groups if g['rect']==target['rect']))==1
+                target['flow_rect']=layers.flow_rect(page,target['rect'],single_line,obstacles)
         return output
 
 def find_block(data,page_index,identity,blocks=None):
@@ -91,6 +96,6 @@ def replace_block(data,page_index,args,blocks=None,words=None):
     stripped=remove_block(data,page_index,block,words)
     if not text.strip():return stripped,None
     identity=block.get('layer_id')
-    result=layers.add(stripped,page_index,{'type':'text','id':identity,'text':text,'font':'source','font_label':block['font'],'size':block['size'],'max_size':block.get('max_size',block['size']),'color':block['color'],'rect':block['rect'],'lineheight':block['lineheight'],'ascender':block['ascender'],'descender':block['descender'],'fixed_frame':True},font_bytes=font_bytes)
+    result=layers.add(stripped,page_index,{'type':'text','id':identity,'text':text,'font':'source','font_label':block['font'],'size':block.get('max_size',block['size']),'max_size':block.get('max_size',block['size']),'color':block['color'],'rect':[block['rect'][0],block['rect'][1],block.get('flow_rect',block['rect'])[2],block['rect'][3]],'min_height':block.get('min_height',fitz.Rect(block['rect']).height),'lineheight':block['lineheight'],'ascender':block['ascender'],'descender':block['descender'],'fixed_frame':True},font_bytes=font_bytes)
     item=next(o for o in layers.inspect_layers(result,page_index) if o['id']==identity) if identity else layers.inspect_layers(result,page_index)[-1]
     return result,next(b for b in inspect_blocks(result,page_index) if b['id']=='layer:'+item['id'])
