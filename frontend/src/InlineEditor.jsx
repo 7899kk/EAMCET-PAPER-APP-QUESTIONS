@@ -32,6 +32,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
  const finish=async()=>{const before=current.current;if(!await save(true))return false;const a=current.current;if(a&&a.editSession===before?.editSession){const next={...a,closing:true};current.current=next;setActive(next)}return true};
  finishRef.current=finish;
  const activate=async(block,point=null)=>{
+  if(point){const host=document.querySelector('.pdf-surface')?.getBoundingClientRect();if(host&&point.zoom)point={...point,pdfX:(point.x-host.x)/point.zoom,pdfY:(point.y-host.y)/point.zoom}}
   if(!block.editable){setError(block.reason||'This text structure needs OCR or reconstruction.');return}
   if(current.current?.id===block.id&&!current.current.closing){if(point?.clicks>1){selectionIntent.current={...point,word:true};if(!switching.current)placeSelection()}return}
   const ticket=++navigation.current;switching.current=true;
@@ -53,7 +54,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
  const blur=()=>{if(!switching.current)return finish()};
  const placeSelection=()=>{
   const el=element.current,intent=selectionIntent.current;if(!el||!intent)return;
-  const at=p=>document.caretRangeFromPoint?.(p.x,p.y);
+  const at=p=>{const host=el.closest('.pdf-surface').getBoundingClientRect(),z=Number(el.dataset.zoom);return document.caretRangeFromPoint?.(p.pdfX===undefined?p.x:host.x+p.pdfX*z,p.pdfY===undefined?p.y:host.y+p.pdfY*z)};
   let range=at(intent);
   if(!range||!el.contains(range.startContainer)){range=document.createRange();range.selectNodeContents(el);range.collapse(false)}
   const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
@@ -62,9 +63,9 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   selectionIntent.current=null;
  };
  useEffect(()=>{
-  const move=e=>{if(switching.current&&selectionIntent.current&&e.buttons===1&&Math.hypot(e.clientX-selectionIntent.current.x,e.clientY-selectionIntent.current.y)>4){selectionIntent.current.end={x:e.clientX,y:e.clientY}}};
+  const move=e=>{if(switching.current&&selectionIntent.current&&e.buttons===1&&Math.hypot(e.clientX-selectionIntent.current.x,e.clientY-selectionIntent.current.y)>4){const host=element.current?.closest('.pdf-surface')?.getBoundingClientRect(),z=Number(element.current?.dataset.zoom);selectionIntent.current.end={x:e.clientX,y:e.clientY,...(host&&z?{pdfX:(e.clientX-host.x)/z,pdfY:(e.clientY-host.y)/z}:{})}}};
   const down=e=>{if(e.detail>1&&selectionIntent.current)selectionIntent.current.word=true};
-  const double=e=>{if(!e.target.closest('.paragraph-hit,.inline-text'))return;selectionIntent.current={x:e.clientX,y:e.clientY,word:true};if(!switching.current)setTimeout(()=>placeSelection(),0)};
+  const double=e=>{if(!e.target.closest('.paragraph-hit,.inline-text')||e.target.closest('[aria-readonly="true"]'))return;if(switching.current&&selectionIntent.current){selectionIntent.current={...selectionIntent.current,word:true};delete selectionIntent.current.end}else{const host=element.current?.closest('.pdf-surface')?.getBoundingClientRect(),z=Number(element.current?.dataset.zoom);selectionIntent.current={x:e.clientX,y:e.clientY,word:true,...(host&&z?{pdfX:(e.clientX-host.x)/z,pdfY:(e.clientY-host.y)/z}:{})}}if(!switching.current)setTimeout(()=>placeSelection(),0)};
   window.addEventListener('pointermove',move);window.addEventListener('pointerdown',down,true);window.addEventListener('dblclick',double,true);
   return()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerdown',down,true);window.removeEventListener('dblclick',double,true)};
  },[]);
@@ -101,7 +102,7 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
 export function InlineText({model:m,zoom,canvasMask}) {
  const a=m.active,show=a&&m.face&&m.masked&&!(a.closing&&canvasMask==='');
  return <>
-  {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
+  {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail,zoom})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
   {a&&<div ref={m.element} data-zoom={zoom} role="textbox" aria-label="Edit text directly on PDF" aria-multiline="true" contentEditable={!a.closing} suppressContentEditableWarning spellCheck={false} className={'inline-text '+(a.error?'inline-error':'')} style={{left:a.rect[0]*zoom,top:(a.rect[1]+((a.ascender-a.descender-a.lineheight)*a.size)/2)*zoom,width:((a.flow_rect||a.rect)[2]-a.rect[0])*zoom,minHeight:(a.rect[3]-a.rect[1])*zoom,maxHeight:Math.max(a.rect[3]-a.rect[1],(a.flow_rect||a.rect)[3]-a.rect[1])*zoom,overflowY:'auto',fontFamily:m.face||'sans-serif',fontSize:(a.max_size||a.size)*zoom,lineHeight:a.lineheight,color:a.color,opacity:show?1:0,pointerEvents:a.closing?'none':'auto'}} onInput={m.input} onPointerDown={e=>e.stopPropagation()} onBlur={()=>m.blur()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();m.revert()}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();m.finish()}}} onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain').replace(/\t/g,'    '))}}/>}
  </>;
 }
