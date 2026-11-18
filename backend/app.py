@@ -184,7 +184,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'fixed-size-flow-6','inline_editing':True,'fixed_size_reflow':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'reliable-selection-7','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -249,16 +249,19 @@ def layer_list(page:int,x_session:str=Header(...)):
 @app.get('/api/document/page/{page}/blocks')
 def text_blocks(page:int,x_session:str=Header(...)):
     s=get_session(x_session)
-    with s.lock:return {'blocks':page_blocks(s,page)}
+    with s.lock:
+        targets=page_blocks(s,page)
+        with fitz.open(stream=s.data,filetype='pdf') as doc:images=bool(doc[page].get_image_info())
+        return {'blocks':targets,'ocr_recommended':images and not any(b['editable'] for b in targets)}
 
 @app.get('/api/document/page/{page}/font')
-def block_font(page:int,block:str,x_session:str=Header(...)):
+def block_font(page:int,block:str,x_session:str=Header(...),compatible:bool=False):
     s=get_session(x_session)
     with s.lock:
         if block=='new':
             face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
             return Response(layers.font_buffer('helv'),media_type='application/octet-stream',headers={'X-Font-Ascender':str(face.ascender),'X-Font-Descender':str(face.descender)})
-        selected=blocks.find_block(s.data,page,block,page_blocks(s,page));data=blocks.font_for_block(s.data,page,selected)
+        selected=blocks.find_block(s.data,page,block,page_blocks(s,page));data=layers.font_buffer(blocks.compatible_font(selected['font'])) if compatible else blocks.font_for_block(s.data,page,selected)
         return Response(data,media_type='application/octet-stream')
 
 @app.post('/api/document/inline-edit')
@@ -282,7 +285,7 @@ async def start_ocr(body:ExportBody,x_session:str=Header(...)):
     available=engine.ocr_languages()
     if args.get('scope','all') not in ('all','current'):raise ValueError('Choose all pages or current page for OCR.')
     if not langs or not all(l in available for l in langs.split('+')):raise ValueError('The selected OCR language is not installed on this server.')
-    if mode not in ('searchable','editable'):raise ValueError('Invalid OCR mode.')
+    if mode not in ('searchable','editable','layout'):raise ValueError('Invalid OCR mode.')
     with s.lock:
         ensure_idle(s)
         if not ocr_slots.acquire(blocking=False):raise HTTPException(503,'Another OCR job is running. Please retry shortly.')

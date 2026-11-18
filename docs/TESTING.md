@@ -1,6 +1,6 @@
 # Verification report
 
-Release `fixed-size-flow-6`, checked on 2026-11-17.
+Release `reliable-selection-7`, checked on 2026-11-18.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **75 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **86 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -104,3 +104,7 @@ FOLIO_TEST_URL=http://127.0.0.1:3015 .venv/bin/python scripts/check_browser_inli
 ```
 
 Source-font data is used only inside the user's edited PDF and the authenticated browser font response. No source font or input PDF is written into the public repository. Previous results above describe the earlier UI revisions; the inline runner is authoritative for the current UI.
+
+## Multiple edits and scanned-page regression
+
+Run `scripts/check_browser_multiple.py` against the local test server. It checks six consecutive paragraph edits without a save pause, unchanged point sizes, nested text, subset fonts with new characters, double-click word replacement, OCR reconstruction of a scanned page with a separate graphic, editing recognized text, full download and independent Poppler/MuPDF reopen. Backend tests also verify unchanged reused nested objects on another page, italic fonts, original source removal and artwork outside OCR text masks. See [same-PDF comparison](../research/SEJDA_COMPARISON_2026_11_18.md).

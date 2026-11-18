@@ -72,3 +72,7 @@ Free use does not remove licence obligations. Preserve attribution and licence t
 The browser-compatible default set now also includes unmodified Liberation Serif Regular/Bold and Liberation Mono Regular/Bold from the installed `fonts-liberation` distribution. Their SIL OFL-1.1 terms and copyright are retained as `backend/fonts/LIBERATION-DISTRO-COPYRIGHT`, alongside `LICENSE_LIBERATION`; reserved names and font bytes are unchanged. These replace raw Type 1 defaults for browser font decoding. Existing Foxit notices/assets remain retained for prior compatibility.
 
 Fonts extracted from a user's uploaded PDF are not application assets: they remain per-document/session data and are copied only into that user's edited PDF and authenticated browser font response. They are never committed to this repository. Unsupported font formats/shaping are left read-only rather than misrepresented as a successful edit.
+
+### Extended font styles
+
+The six unmodified Liberation Sans/Serif/Mono Italic and BoldItalic TTFs are included under the same SIL OFL-1.1 distribution copyright already retained in `backend/fonts/LIBERATION-DISTRO-COPYRIGHT`. FontTools repacks per-document embedded sfnt tables for browser alignment without publishing the user's fonts as application assets. FontTools is already a declared MIT dependency.

@@ -3,17 +3,17 @@
 The metadata belongs to the object, so it survives saving/reopening. Deletion
 removes the drawing instruction and its resource, rather than hiding the object.
 """
-import io,json,math,re,uuid
+import io,json,math,re,uuid,hashlib
 from functools import lru_cache
 from pathlib import Path
 import pikepdf
 import pymupdf as fitz
 from PIL import Image
 
-FONTS={'helv','hebo','tiro','tibo','cour','cobo'}
-FONT_FILES={'helv':'LiberationSans-Regular.ttf','hebo':'LiberationSans-Bold.ttf','tiro':'LiberationSerif-Regular.ttf','tibo':'LiberationSerif-Bold.ttf','cour':'LiberationMono-Regular.ttf','cobo':'LiberationMono-Bold.ttf'}
+FONTS={'helv','hebo','heit','hebi','tiro','tibo','tiit','tibi','cour','cobo','coit','cobi'}
+FONT_FILES={'helv':'LiberationSans-Regular.ttf','hebo':'LiberationSans-Bold.ttf','tiro':'LiberationSerif-Regular.ttf','tibo':'LiberationSerif-Bold.ttf','cour':'LiberationMono-Regular.ttf','cobo':'LiberationMono-Bold.ttf','heit':'LiberationSans-Italic.ttf','hebi':'LiberationSans-BoldItalic.ttf','tiit':'LiberationSerif-Italic.ttf','tibi':'LiberationSerif-BoldItalic.ttf','coit':'LiberationMono-Italic.ttf','cobi':'LiberationMono-BoldItalic.ttf'}
 
-@lru_cache(maxsize=6)
+@lru_cache(maxsize=12)
 def font_buffer(name):return (Path(__file__).with_name('fonts')/FONT_FILES[name]).read_bytes()
 
 def insert_unicode_font(page):
@@ -188,8 +188,8 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                 for i,line in enumerate(frame_lines(text,rect.width,size,face)):
                     if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
             elif draw_text(p,p.rect,text,font,size,color,font_bytes,lineheight)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
-            meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449')})
-            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height'):
+            meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449'),'font_key':hashlib.sha256(font_bytes or font_buffer(font)).hexdigest()[:20]})
+            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height','font_notice'):
                 if key in args:meta[key]=args[key]
         elif kind=='image':
             rect=checked_rect(page,args['rect'])
@@ -235,7 +235,7 @@ def update(data,page_index,args):
     merged={**old,**{k:v for k,v in args.items() if k in ('rect','text','font','size','color','width','opacity')}}
     if old['type']=='text' and merged['font']!=old['font'] and merged['font'] in FONTS:
         face=fitz.Font(fontbuffer=font_buffer(merged['font']))
-        merged.update(font_label={'helv':'Sans','hebo':'Sans Bold','tiro':'Serif','tibo':'Serif Bold','cour':'Monospace','cobo':'Monospace Bold'}[merged['font']],ascender=face.ascender,descender=face.descender)
+        merged.update(font_label={'helv':'Sans','hebo':'Sans Bold','tiro':'Serif','tibo':'Serif Bold','cour':'Monospace','cobo':'Monospace Bold','heit':'Sans Italic','hebi':'Sans Bold Italic','tiit':'Serif Italic','tibi':'Serif Bold Italic','coit':'Monospace Italic','cobi':'Monospace Bold Italic'}[merged['font']],ascender=face.ascender,descender=face.descender)
     font_bytes=font_for_layer(data,page_index,old['id']) if old.get('font')=='source' and merged.get('font')=='source' else None
     if 'size' in args and old.get('fixed_frame'):merged['max_size']=args['size']
     if old.get('fixed_frame') and 'rect' in args and fitz.Rect(args['rect']).height!=fitz.Rect(old['rect']).height:merged['min_height']=fitz.Rect(args['rect']).height

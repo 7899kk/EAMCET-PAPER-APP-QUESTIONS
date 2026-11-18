@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `fixed-size-flow-6`.
+Release `reliable-selection-7`.
 
 ## Click text and type
 
@@ -24,7 +24,7 @@ Text baked into an image is not native editable text. Use OCR to make scans sear
 
 ## Limits
 
-Shadowed/overlapping decorative text, Type 3 or outlined fonts, non-web-compatible embedded fonts, complex scripts, text inside reused external objects and unsupported transformations may be read-only. This is intentional: the editor does not pretend to change one visible copy while leaving another behind. Full document-wide paragraph reflow, arbitrary flattened artwork reconstruction and certificate signing are not implemented. Rotate to 0° before native/layer edits.
+Horizontal native text inside nested objects and many decorative/Type 3 fonts can now be rebuilt. Original fonts are retained when compatible; font-decoding or missing-glyph problems use a disclosed compatible font at the same point size. Outlined artwork with no characters, complex scripts and unsupported transformations still need reconstruction or remain unsupported. This is intentional: the editor does not pretend to change one visible copy while leaving another behind. Full document-wide paragraph reflow, arbitrary flattened artwork reconstruction and certificate signing are not implemented. Rotate to 0° before native/layer edits.
 
 OCR is local, shows progress and supports cancellation. Searchable output preserves scan appearance; editable-copy mode reconstructs recognized Western Latin text and loses original images/fonts/exact formatting. Recognition errors still need review. Only installed languages are offered.
 
@@ -37,3 +37,9 @@ See [testing](TESTING.md) and [API](API.md).
 ## Sejda comparison
 
 A generated sample was edited and downloaded from Sejda on 2026-11-17. Replacing `feeling` with `Enthusiam` retained its 18 pt size and moved following words right. In this example Sejda did not wrap an excessively long single-line replacement; its export extended beyond the page. Folio keeps the fixed-size behavior and adds safe wrapping instead of off-page clipping. See [comparison observations](../research/SEJDA_REFLOW_CHECK.md).
+
+## Scanned words and repeated edits
+
+Click **Make scanned text editable** on a scanned page, review the reconstruction notice, and start local OCR. The editable scan mode keeps raster artwork outside recognized text regions, replaces original recognized text pixels with sampled paper colour and inserts real editable text. Original fonts and textured/photo backgrounds are approximate. This differs from searchable OCR, which leaves scanned pixels unchanged, and the older text-only reconstruction, which discards artwork. Undo restores the original.
+
+Clicking another paragraph now waits for its predecessor's pending save, resolves current source IDs and preserves focus. Double-click selects a word; drag selects a range. See the [same-PDF Sejda comparison](../research/SEJDA_COMPARISON_2026_11_18.md).
