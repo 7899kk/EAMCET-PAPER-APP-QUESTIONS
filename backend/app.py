@@ -184,7 +184,7 @@ async def read_file(file):
     return data
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'reliable-selection-7','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'prepared-downloads-8','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -228,6 +228,19 @@ def page_pdf(page:int,x_session:str=Header(...),exclude_block:str=''):
         if not 0<=page<len(doc):raise ValueError('Invalid page.')
         preview.insert_pdf(doc,from_page=page,to_page=page,links=False,widgets=False)
         return Response(preview.tobytes(garbage=3,deflate=True),media_type='application/pdf')
+
+@app.get('/api/document/page/{page}/edit-patch')
+def edit_patch(page:int,block:str,x_session:str=Header(...)):
+    s=get_session(x_session)
+    with s.lock:
+        selected=blocks.find_block(s.data,page,block,page_blocks(s,page))
+        data=blocks.remove_block(s.data,page,selected,page_words(s,page))
+    with fitz.open(stream=data,filetype='pdf') as doc:
+        p=doc[page];rect=(fitz.Rect(selected['rect'])+(-1,-1,1,1))&p.rect
+        scale=min(2,(4_000_000/max(rect.get_area(),1))**.5)
+        pix=p.get_pixmap(matrix=fitz.Matrix(scale,scale),clip=rect,alpha=False)
+        bounds=[pix.x/scale,pix.y/scale,(pix.x+pix.width)/scale,(pix.y+pix.height)/scale]
+        return Response(pix.tobytes('png'),media_type='image/png',headers={'X-Patch-Rect':json.dumps(bounds)})
 
 @app.get('/api/document/page/{page}/text')
 def text(page:int,x_session:str=Header(...),words_only:bool=False):

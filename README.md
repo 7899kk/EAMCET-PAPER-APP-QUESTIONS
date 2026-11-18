@@ -35,7 +35,7 @@ For development, run the backend above and `cd frontend && npm run dev` in a sec
 
 1. Upload a PDF or choose **Try sample PDF**.
 2. Select **Edit text**, click a supported paragraph and type directly on the PDF. No word underlines or floating Save dialog are shown.
-3. Text wraps and grows into available space at the same font size; a usable embedded font, colour and line spacing are preserved. Changes save after a short pause.
+3. Text wraps and grows into available space at the same font size; a usable embedded font, colour and line spacing are preserved. The page prepares its fonts and background previews up front so selecting prepared paragraphs does not reload the page. Changes save after a short pause.
 4. **Download PDF** waits for pending text edits. Reopen the download to check the result.
 5. **Add text** lets you click a blank area and type directly. **Layers** provides advanced move/resize/font/delete controls for saved text and images.
 6. **Layers** can also select supported original embedded-image occurrences. Deletion affects that occurrence only; moving an original image converts it to a rectangular managed layer, with clipping limitations disclosed.
@@ -82,3 +82,5 @@ cd frontend && npm run build
 ```
 
 Full tests need Tesseract English, `pdftotext` (Poppler), and DejaVuSans at `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`. Generated PDFs and the independently reopened download are in `tests/artifacts/`. These tests are an engineering regression suite, not a guarantee of compatibility with all PDFs.
+
+Download recovery: after **Download PDF** prepares the real edited file, persistent **Save file** and **Open file** links remain available if the browser blocks automatic downloads. New edits invalidate an older prepared download. Requests have timeouts and failed exports can be retried. See [current guide](docs/EDITOR_GUIDE.md).

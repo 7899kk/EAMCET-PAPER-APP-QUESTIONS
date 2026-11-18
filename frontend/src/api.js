@@ -8,13 +8,19 @@ export function apiUrl(path, origin = window.location.origin) {
 }
 
 export async function fetchServer(path, options = {}) {
+  const {timeoutMs=90000,signal,...requestOptions}=options;
+  const controller=new AbortController();let timedOut=false;
+  const abort=()=>controller.abort(signal?.reason);
+  if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+  const timeout=setTimeout(()=>{timedOut=true;controller.abort()},timeoutMs);
   let response;
   try {
-    response = await fetch(apiUrl(path), { ...options, credentials: 'same-origin' });
+    response = await fetch(apiUrl(path), { ...requestOptions, signal:controller.signal, credentials: 'same-origin' });
   } catch (error) {
+    if(timedOut)throw new Error('The PDF server took too long to respond. Your saved changes are preserved. Retry; the free server may be waking up.');
     if (error.name === 'AbortError') throw error;
-    throw new Error('Could not reach the PDF server. Check your connection, then reload and sign in again. If the free server is waking up, wait about a minute and retry.');
-  }
+    throw new Error('Could not reach the PDF server. Check your connection, then retry. If the free server is waking up, wait about a minute.');
+  } finally {clearTimeout(timeout);signal?.removeEventListener('abort',abort)}
   if (response.status === 401) {
     throw new Error('Your editor sign-in expired. Reload this page and sign in again.');
   }

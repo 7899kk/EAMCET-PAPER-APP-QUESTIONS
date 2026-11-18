@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `reliable-selection-7`.
+Release `prepared-downloads-8`.
 
 ## Click text and type
 
@@ -10,7 +10,11 @@ The original font size stays fixed while typing. On a supported single line, fol
 
 The original embedded TrueType/OpenType font, colour, starting position and line spacing are retained where supported. Standard fonts without embedded data use bundled compatible free fonts. Page edges, detected neighbouring text, images, graphics and containing panels limit expansion. If there is no room, saving fails explicitly and preserves your draft and the previous PDF. Resize/move the saved layer, manually choose a smaller size under Layers, or shorten the text. Separate paragraphs/images are not automatically pushed onto another page. Escape restores the last saved text; Ctrl/Cmd+Enter finishes editing. Enter inserts a line break.
 
-During editing, a temporary page preview removes the original paragraph's encoded characters so the live browser text does not overlap its old image. This is not a white rectangle or a raster replacement. On automatic save, the old characters are genuinely removed and a vector text object is written into the same frame. The document is still a real PDF and exported changes survive reopening.
+Before editing is enabled, the current page is rendered and its fonts and small text-free background patches are prepared. Selecting a prepared paragraph reuses those resources instead of fetching and rendering the whole page again. Preparation happens once per visited page; longer or more complex pages can take more time. Fonts and preview resources stay only in bounded per-document browser memory and are cleared when the document is closed or replaced.
+
+Background patches retain the original page's images, colours and graphics with just the selected source characters removed. They are temporary display resources, not white rectangles or substitutes for PDF processing. Autosave still commits real vector text into the actual PDF.
+
+**Download PDF** first saves pending text. If automatic downloading is blocked, use the persistent **Save file** link or **Open file** to open the prepared download. Links remain valid until dismissed, replaced, or invalidated by a new edit/document. Failed exports show an error and permit retry; they do not claim that a file was saved to your device.
 
 **Add text** also works directly: choose the tool, click a blank area, and type. It saves automatically. Use **Layers** for advanced font/colour changes, movement, resizing or deletion of saved text objects. Imported paragraphs keep their embedded font available in the layer controls.
 

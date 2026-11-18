@@ -108,3 +108,7 @@ Layers also return supported direct native raster image occurrences with `image:
 ### Broader native text support
 
 The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. Direct source operands remain the preferred removal method. Other horizontal native text, including nested Form content, uses text-only glyph-region removal with image/graphics removal disabled and no cover fill. Hidden OCR search text is not represented as visible native editing. Font tables are repacked for browser compatibility; new characters absent from a subset font can trigger a compatible full font at the same point size. The notice is returned and saved with the text layer. The font endpoint accepts `compatible=true` for a browser font-decoding fallback; inline edits send `font_fallback:true` when this path is needed.
+
+### Prepared display resources
+
+`GET /document/page/{page}/edit-patch?block=ID` returns a PNG of the selected text area's real background with original text removed. `X-Patch-Rect` contains its page-point rectangle. No PDF commit or history change occurs; the image is bounded to four million pixels. The frontend prepares these patches and font faces up front, reuses them across paragraph selections, and invalidates them for unrelated document operations/history. Browser preview cache is bounded to 96 entries / 16 MB; prepared font faces to 32 entries / 24 MB except an actively used face. Caches are per-document and cleared on close/replacement.

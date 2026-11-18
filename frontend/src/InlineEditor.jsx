@@ -1,15 +1,26 @@
+import {createEditResources} from './editResources.js';
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 
-export function useInlineEditor({api,session,page,version,onCommit,setError,canvasMask}) {
- const [blocks,setBlocks]=useState([]),[ready,setReady]=useState(false),[active,setActive]=useState(null),[status,setStatus]=useState(''),[face,setFace]=useState(null),[masked,setMasked]=useState(false),[needsOcr,setNeedsOcr]=useState(false);
+export function useInlineEditor({api,session,page,version,epoch,onCommit,onDraftChange,setError,canvasReady,canvasPageReady}) {
+ const [blocks,setBlocks]=useState([]),[ready,setReady]=useState(false),[active,setActive]=useState(null),[status,setStatus]=useState(''),[face,setFace]=useState(null),[masked,setMasked]=useState(false),[needsOcr,setNeedsOcr]=useState(false),[patch,setPatch]=useState(null),[progress,setProgress]=useState({done:0,total:0});
+ const apiRef=useRef(api);apiRef.current=api;
+ const resources=useRef(null);if(!resources.current)resources.current=createEditResources(()=>apiRef.current);
+ const context=useRef(''),commits=useRef(0),analysisCommit=useRef(0);
  const current=useRef(null),draft=useRef(''),saved=useRef(''),timer=useRef(),flight=useRef(null),element=useRef(),sequence=useRef(0),click=useRef(null),finishRef=useRef(),switching=useRef(false),navigation=useRef(0),selectionIntent=useRef(null);
- useEffect(()=>{navigation.current++;switching.current=false;selectionIntent.current=null;current.current=null;setActive(null);setNeedsOcr(false);setFace(null);setMasked(false);clearTimeout(timer.current);draft.current='';saved.current=''},[session]);
+ useEffect(()=>{resources.current.reset();context.current='';commits.current=0;analysisCommit.current=0;setPatch(null);navigation.current++;switching.current=false;selectionIntent.current=null;current.current=null;setActive(null);setNeedsOcr(false);setFace(null);setMasked(false);clearTimeout(timer.current);draft.current='';saved.current=''},[session]);
  useEffect(()=>{
   if(!session){setBlocks([]);setReady(false);current.current=null;setActive(null);return}
-  let cancelled=false;const controller=new AbortController();setReady(false);
-  api(`/document/page/${page}/blocks`,{signal:controller.signal}).then(r=>r.json()).then(data=>{if(!cancelled){setBlocks(data.blocks);setNeedsOcr(!!data.ocr_recommended);setReady(true)}}).catch(e=>{if(!cancelled)setError(e.message)});
+  let cancelled=false;const controller=new AbortController();
+  const key=`${session}:${page}:${epoch}`;if(context.current!==key){if(context.current.split(':')[2]!==String(epoch))resources.current.clearPatches();context.current=key;setBlocks([]);setNeedsOcr(false);setReady(false)}
+  const atCommit=commits.current;
+  api(`/document/page/${page}/blocks`,{signal:controller.signal}).then(r=>r.json()).then(async data=>{
+   if(cancelled)return;setBlocks(data.blocks);analysisCommit.current=atCommit;setNeedsOcr(!!data.ocr_recommended);
+   const preparation=await resources.current.warm(data.blocks,page,(done,total)=>{if(!cancelled)setProgress({done,total})},()=>cancelled);
+   if(!cancelled){setReady(true);if(preparation.failures)setError('Some text previews could not be prepared. You can still download the saved PDF or click a paragraph to retry. '+preparation.error)}
+  }).catch(e=>{if(!cancelled){setError(e.message);setReady(true)}});
   return()=>{cancelled=true;controller.abort()};
- },[api,session,page,version]);
+ },[api,session,page,version,epoch]);
+ useEffect(()=>()=>resources.current.reset(),[]);
  useEffect(()=>{if(current.current?.page!==page){current.current=null;setActive(null);clearTimeout(timer.current)}},[session,page]);
  const save=async(final=false)=>{
   clearTimeout(timer.current);
@@ -19,11 +30,13 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   const job=(async()=>{try{
    const result=await(await api('/document/inline-edit',{method:'POST',body:JSON.stringify({operation:'replace-block',args:{page:a.page,id:a.id,original:saved.current,text,rect:a.rect,size:a.size,color:a.color,font_fallback:!!a.font_fallback}})})).json();
    if(current.current?.editSession!==a.editSession)return true;
-   saved.current=result.inline_block?.text??text;
+   saved.current=result.inline_block?.text??text;commits.current++;
+   let previewWarning='',prepared=null;if(result.inline_block){try{prepared=await resources.current.prepare(result.inline_block,a.page)}catch(e){previewWarning='Changes saved, but the preview could not refresh. Download is still available.'}}
+   if(current.current?.editSession!==a.editSession)return true;
    if(current.current===a||current.current?.editSession===a.editSession){
-    const next=result.inline_block?{...a,...result.inline_block,error:null}: {...a,id:'deleted',closing:true,error:null};current.current=next;setActive(next);
+    const next=result.inline_block?{...a,...result.inline_block,error:null}: {...a,id:'deleted',closing:true,error:null};current.current=next;setActive(next);if(prepared){setFace(prepared.face);setPatch(prepared.patch);setMasked(true);resources.current.pin(prepared.patch?.key)}
    }
-   onCommit(result);setError('');setStatus(draft.current===text?'All changes saved':'Editing…');return true;
+   onCommit(result);setError(previewWarning);setStatus(draft.current===text?'All changes saved':'Editing…');return true;
   }catch(e){if(current.current?.editSession!==a.editSession)return false;if(current.current){current.current.error=e.message;setActive({...current.current})}setStatus('Could not save this text');setError(e.message);return false}})();
   flight.current=job;const success=await job;flight.current=null;
   if(success&&draft.current!==saved.current)timer.current=setTimeout(()=>save(),350);
@@ -35,21 +48,24 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   if(point){const host=document.querySelector('.pdf-surface')?.getBoundingClientRect();if(host&&point.zoom)point={...point,pdfX:(point.x-host.x)/point.zoom,pdfY:(point.y-host.y)/point.zoom}}
   if(!block.editable){setError(block.reason||'This text structure needs OCR or reconstruction.');return}
   if(current.current?.id===block.id&&!current.current.closing){if(point?.clicks>1){selectionIntent.current={...point,word:true};if(!switching.current)placeSelection()}return}
-  const ticket=++navigation.current;switching.current=true;
+  const ticket=++navigation.current;switching.current=true;element.current?.blur();
+  const refresh=!!flight.current||draft.current!==saved.current||analysisCommit.current!==commits.current;
   if(point)selectionIntent.current={...point,word:point.clicks>1};
   if(!await save(true)){switching.current=false;return}
   if(ticket!==navigation.current)return;
   // Saving another paragraph changes source instruction IDs. Resolve against
   // the current PDF before loading its font and text-free preview.
-  if(block.id!=='new'){
+  if(block.id!=='new'&&refresh){
    try{const data=await(await api(`/document/page/${page}/blocks`)).json();
     block=data.blocks.find(b=>b.id===block.id)||data.blocks.find(b=>b.text===block.text&&b.rect.every((n,i)=>Math.abs(n-block.rect[i])<.3));
-    if(!block)throw new Error('This text changed. Click its current position again.');setBlocks(data.blocks);
+    if(!block)throw new Error('This text changed. Click its current position again.');setBlocks(data.blocks);analysisCommit.current=commits.current;
    }catch(e){switching.current=false;setError(e.message);return}
   }
   if(ticket!==navigation.current)return;
-  setError('');
-  const next={...block,size:block.max_size||block.size,page,editSession:++sequence.current,closing:false};current.current=next;draft.current=block.text;saved.current=block.text;click.current=point;setMasked(block.id==='new');setFace(null);setActive(next);setStatus('Preparing text…');
+  setError('');let prepared;
+  try{prepared=await resources.current.prepare(block,page)}catch(e){switching.current=false;setError(e.message);setStatus('Could not prepare text. Try again.');return}
+  if(ticket!==navigation.current)return;
+  const next={...block,...prepared,size:block.max_size||block.size,page,activationTicket:ticket,editSession:++sequence.current,closing:false};current.current=next;draft.current=block.text;saved.current=block.text;click.current=point;setMasked(true);setFace(prepared.face);setPatch(prepared.patch);resources.current.pin(prepared.patch?.key);setActive(next);setStatus('Ready to edit');
  };
  const blur=()=>{if(!switching.current)return finish()};
  const placeSelection=()=>{
@@ -70,39 +86,30 @@ export function useInlineEditor({api,session,page,version,onCommit,setError,canv
   return()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerdown',down,true);window.removeEventListener('dblclick',double,true)};
  },[]);
  const createAt=(point,size=16,color='#263449')=>activate({id:'new',kind:'new',text:'',rect:[point.x,point.y,Math.min(point.x+320,point.width-12),Math.min(point.y+110,point.height-12)],font:'Sans',size,color,lineheight:1.2,ascender:1.05,descender:-.3,editable:true});
- useEffect(()=>{
-  if(!active)return;let alive=true,loaded;
-  const name='folio-inline-'+active.editSession+'-'+(active.font_key||'new')+(active.font_fallback?'-compatible':'');
-  api(`/document/page/${active.page}/font?block=${encodeURIComponent(active.id)}${active.font_fallback?'&compatible=true':''}`).then(async r=>({bytes:await r.arrayBuffer(),asc:Number(r.headers.get('X-Font-Ascender'))||active.ascender,desc:Number(r.headers.get('X-Font-Descender'))||active.descender})).then(async ({bytes,asc,desc})=>{
-   if(active.id==='new'&&current.current?.editSession===active.editSession){const next={...current.current,ascender:asc,descender:desc};current.current=next;setActive(next)}
-   const font=new FontFace(name,bytes,{ascentOverride:`${asc*100}%`,descentOverride:`${Math.abs(desc)*100}%`,lineGapOverride:'0%'});
-   await font.load();if(alive){document.fonts.add(font);loaded=font;setFace(name)}
-  }).catch(e=>{if(!alive)return;if(!active.font_fallback&&current.current?.editSession===active.editSession){const next={...current.current,font_fallback:true,font_notice:'The browser could not load the original font. A compatible font is used at the same point size.'};current.current=next;setActive(next)}else setError(e.message)});
-  return()=>{alive=false;if(loaded)document.fonts.delete(loaded)};
- },[active?.editSession,active?.font_key,active?.font_fallback]);
  useLayoutEffect(()=>{
-  if(active&&!active.closing&&canvasMask===active.id)setMasked(true);
-  if(active?.closing&&canvasMask===''){current.current=null;setActive(null);setMasked(false);setStatus('All changes saved')}
- },[canvasMask,active?.closing,active?.id]);
+  if(active?.closing&&canvasReady&&current.current?.editSession===active.editSession&&current.current?.closing){current.current=null;setActive(null);setPatch(null);setMasked(false);resources.current.pin('');setStatus('All changes saved')}
+ },[canvasReady,active?.closing]);
  useLayoutEffect(()=>{if(active&&element.current){element.current.textContent=draft.current}},[active?.editSession]);
  useEffect(()=>{
-  if(!active||!face||!masked||active.closing||!element.current)return;
+  if(!active||!face||!masked||active.closing||!element.current||active.activationTicket!==navigation.current)return;
   const el=element.current;if(document.activeElement!==el||selectionIntent.current){el.focus({preventScroll:true});placeSelection()}switching.current=false;setStatus(draft.current===saved.current?'All changes saved':'Editing…');
  },[face,masked,active?.editSession]);
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  const input=()=>{
+  onDraftChange?.();
   const el=element.current,a=current.current;draft.current=el?.innerText.replace(/\r/g,'').replace(/\t/g,'    ').replace(/\u00a0/g,' ')||'';
   if(a){a.error=null;el.style.fontSize=(a.max_size||a.size)*Number(el.dataset.zoom)+'px'}
   setStatus('Editing…');clearTimeout(timer.current);timer.current=setTimeout(()=>save(),550);
  };
  const revert=()=>{clearTimeout(timer.current);setError('');draft.current=saved.current;if(element.current)element.current.textContent=saved.current;if(current.current)current.current.error=null;finish()};
- return {blocks,ready,needsOcr,active,face,masked,status,element,activate,createAt,input,save,finish,blur,revert,get dirty(){return draft.current!==saved.current}};
+ return {blocks,ready:ready&&canvasPageReady,needsOcr,active,face,masked,patch,progress,status,element,activate,createAt,input,save,finish,blur,revert,get dirty(){return draft.current!==saved.current}};
 }
 
-export function InlineText({model:m,zoom,canvasMask}) {
- const a=m.active,show=a&&m.face&&m.masked&&!(a.closing&&canvasMask==='');
+export function InlineText({model:m,zoom}) {
+ const a=m.active,show=a&&m.face&&m.masked;
  return <>
-  {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail,zoom})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
+  {a&&m.patch&&<img className="edit-background-patch" alt="" draggable={false} src={m.patch.url} style={{left:m.patch.rect[0]*zoom,top:m.patch.rect[1]*zoom,width:(m.patch.rect[2]-m.patch.rect[0])*zoom,height:(m.patch.rect[3]-m.patch.rect[1])*zoom}}/>}
+  {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.preventDefault();e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail,zoom})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
   {a&&<div ref={m.element} data-zoom={zoom} role="textbox" aria-label="Edit text directly on PDF" aria-multiline="true" contentEditable={!a.closing} suppressContentEditableWarning spellCheck={false} className={'inline-text '+(a.error?'inline-error':'')} style={{left:a.rect[0]*zoom,top:(a.rect[1]+((a.ascender-a.descender-a.lineheight)*a.size)/2)*zoom,width:((a.flow_rect||a.rect)[2]-a.rect[0])*zoom,minHeight:(a.rect[3]-a.rect[1])*zoom,maxHeight:Math.max(a.rect[3]-a.rect[1],(a.flow_rect||a.rect)[3]-a.rect[1])*zoom,overflowY:'auto',fontFamily:m.face||'sans-serif',fontSize:(a.max_size||a.size)*zoom,lineHeight:a.lineheight,color:a.color,opacity:show?1:0,pointerEvents:a.closing?'none':'auto'}} onInput={m.input} onPointerDown={e=>e.stopPropagation()} onBlur={()=>m.blur()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();m.revert()}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();m.finish()}}} onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain').replace(/\t/g,'    '))}}/>}
  </>;
 }
