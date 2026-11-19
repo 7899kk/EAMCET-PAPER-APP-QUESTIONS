@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 import pymupdf as fitz
 from playwright.async_api import async_playwright,expect
+from browser_helpers import sign_in
 from backend import layers
 OUT=Path(__file__).resolve().parent.parent/'tests/artifacts/browser';OUT.mkdir(parents=True,exist_ok=True)
 BASE=os.environ.get('FOLIO_TEST_URL','http://127.0.0.1:3018')
@@ -30,7 +31,7 @@ async def main():
   browser=await p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
   for mobile in [False,True]:
    ctx=await browser.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':1000},is_mobile=mobile,has_touch=mobile,accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-   page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+   await sign_in(ctx,BASE);page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    await page.goto(BASE);await page.locator('input[type=file]').first.set_input_files(generate())
    field=page.get_by_role('textbox',name='Edit text directly on PDF',exact=True)
    # Cold double-click before any editing surface/font has been prepared.

@@ -2,6 +2,7 @@
 import asyncio,json,os,re,shutil,subprocess,sys
 from pathlib import Path
 from playwright.async_api import async_playwright,expect
+from browser_helpers import sign_in
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 import pymupdf as fitz
 from PIL import Image
@@ -35,7 +36,7 @@ async def main():
   browser=await p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
   for mobile in [False,True]:
    ctx=await browser.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':960},is_mobile=mobile,has_touch=mobile,accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-   page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+   await sign_in(ctx,BASE);page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    await page.goto(BASE);await page.locator('input[type=file]').first.set_input_files(generate())
    target=page.get_by_role('textbox',name=re.compile('^Edit paragraph: So with this'))
    await expect(target).to_be_visible(timeout=30000);await target.click()
@@ -104,7 +105,7 @@ async def main():
    await ctx.close()
   # OCR's editable reconstruction uses the same direct editor.
   ctx=await browser.new_context(viewport={'width':1440,'height':960},accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-  page=await ctx.new_page();await page.goto(BASE)
+  await sign_in(ctx,BASE);page=await ctx.new_page();await page.goto(BASE)
   with fitz.open() as doc:
    p0=doc.new_page();p0.insert_text((60,100),'ASHOK INVOICE',fontsize=30);pix=p0.get_pixmap(dpi=180)
   with fitz.open() as doc:
@@ -126,7 +127,7 @@ async def main():
    # The provided document is read/uploaded ONLY to the loopback test server.
    for mobile in [False,True]:
     ctx=await browser.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':960},is_mobile=mobile,has_touch=mobile,accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-    page=await ctx.new_page();await page.goto(BASE);await page.locator('input[type=file]').first.set_input_files(private)
+    await sign_in(ctx,BASE);page=await ctx.new_page();await page.goto(BASE);await page.locator('input[type=file]').first.set_input_files(private)
     await expect(page.locator('.paragraph-hit')).not_to_have_count(0,timeout=30000)
     if mobile:await page.get_by_role('button',name='Toggle page panel',exact=True).click()
     await page.get_by_role('button',name='Open page 2',exact=True).click()

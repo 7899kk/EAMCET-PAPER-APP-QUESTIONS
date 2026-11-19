@@ -76,3 +76,7 @@ Fonts extracted from a user's uploaded PDF are not application assets: they rema
 ### Extended font styles
 
 The six unmodified Liberation Sans/Serif/Mono Italic and BoldItalic TTFs are included under the same SIL OFL-1.1 distribution copyright already retained in `backend/fonts/LIBERATION-DISTRO-COPYRIGHT`. FontTools repacks per-document embedded sfnt tables for browser alignment without publishing the user's fonts as application assets. FontTools is already a declared MIT dependency.
+
+## Optional public account client
+
+`@supabase/supabase-js` 2.119.2 and its auth/functions/postgrest/realtime/storage SDK dependencies, `@supabase/phoenix` 0.4.5 and `iceberg-js` 0.8.1 are MIT-licensed. `tslib` 2.8.1 is 0BSD. Installed package licences were checked, and their exact notices are retained under `THIRD_PARTY/accounts/`. The dependency versions are pinned in the frontend lockfile. Supabase is used only for accounts; documents are not sent there. A free project is sufficient within its current account/email/usage limits, which remain the provider's limits rather than an unlimited-service promise.

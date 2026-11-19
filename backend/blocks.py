@@ -47,16 +47,16 @@ def inspect_blocks(data,page_index,words=None):
             for line in block.get('lines',[]):
                 spans=[{**s,'text':''.join(c['c'] for c in s['chars'])} for s in line['spans'] if any(c['c'].strip() for c in s['chars'])]
                 if not spans:continue
-                uniform=len({_style(s) for s in spans})==1 and tuple(line['dir'])==(1.,0.)
+                uniform=max(s['size'] for s in spans)-min(s['size'] for s in spans)<.1 and tuple(line['dir'])==(1.,0.)
                 pieces=[spans] if uniform else [[s] for s in spans]
                 for piecespans in pieces:
                     box=fitz.Rect(piecespans[0]['bbox']);text=''.join(s['text'] for s in piecespans).replace('\u00a0',' ')
                     for span in piecespans:box|=fitz.Rect(span['bbox'])
-                    style=_style(piecespans[0]);can_join=uniform and previous and previous['style']==style and abs(box.x0-previous['rect'][0])<3 and 0<box.y0-previous['last_y']<style[1]*1.9
+                    main_span=max(piecespans,key=lambda s:len(s['text']));style=_style(main_span);can_join=uniform and previous and previous['style']==style and abs(box.x0-previous['rect'][0])<3 and 0<box.y0-previous['last_y']<style[1]*1.9
                     if can_join:
                         previous['text']+=' '+text;previous['rect']=list(fitz.Rect(previous['rect'])|box);previous['origins'].append(piecespans[0]['origin'][1]);previous['last_y']=box.y0;previous['chars'].extend(c for s in piecespans for c in s['chars'])
                     else:
-                        previous={'style':style,'text':text,'rect':list(box),'last_y':box.y0,'origins':[piecespans[0]['origin'][1]],'ascender':piecespans[0]['ascender'],'descender':piecespans[0]['descender'],'chars':[c for s in piecespans for c in s['chars']],'horizontal':tuple(line['dir'])==(1.,0.)}
+                        previous={'style':style,'text':text,'rect':list(box),'last_y':box.y0,'origins':[piecespans[0]['origin'][1]],'ascender':main_span['ascender'],'descender':main_span['descender'],'chars':[c for s in piecespans for c in s['chars']],'horizontal':tuple(line['dir'])==(1.,0.),'mixed':len({_style(s) for s in piecespans})>1}
                         groups.append(previous)
                     if not uniform:previous=None
         unique=[]
@@ -81,16 +81,17 @@ def inspect_blocks(data,page_index,words=None):
             key=(group['style'][0],resource)
             if key not in font_cache:font_cache[key]=font_choice(doc,page,group['style'][0],resource)
             font_xref,fallback,font_notice,font_key=font_cache[key]
+            if group.get('mixed'):font_notice=(font_notice+' ' if font_notice else '')+'This line mixes text styles. Editing reflows it using its main font at the original point size.'
             identity='block:'+hashlib.sha256((';'.join(w['id'] for w in contained)+group['text']).encode()).hexdigest()[:24]
             origins=group['origins'];size=group['style'][1]
             leading=(origins[1]-origins[0])/size if len(origins)>1 else 1.2
-            output.append({'id':identity,'kind':'native','text':group['text'],'rect':group['rect'],'font':group['style'][0],'size':size,'color':f"#{group['style'][2]:06x}",'lineheight':max(1.,min(2.,leading)),'ascender':group['ascender'],'descender':group['descender'],'editable':editable,'word_ids':[w['id'] for w in contained],'font_resource':resource,'font_xref':font_xref,'fallback_font':fallback,'font_notice':font_notice,'font_key':font_key,'removal':'operands' if direct else 'glyphs','erase_rects':[list(fitz.Rect(c['bbox'])) for c in group['chars'] if c['c'].strip()],'reason':None if editable else 'This styled/overlapping text or font cannot be safely rebuilt as one paragraph.'})
+            output.append({'id':identity,'kind':'native','text':group['text'],'rect':group['rect'],'font':group['style'][0],'size':size,'color':f"#{group['style'][2]:06x}",'lineheight':max(1.,min(2.,leading)),'ascender':group['ascender'],'descender':group['descender'],'editable':editable,'word_ids':[w['id'] for w in contained],'font_resource':resource,'font_xref':font_xref,'fallback_font':fallback,'font_notice':font_notice,'font_key':font_key,'auto_width':len(origins)==1,'removal':'operands' if direct else 'glyphs','erase_rects':[list(fitz.Rect(c['bbox'])) for c in group['chars'] if c['c'].strip()],'reason':None if editable else 'This styled/overlapping text or font cannot be safely rebuilt as one paragraph.'})
         for item in owned:
-            if item['type']=='text':output.append({'id':'layer:'+item['id'],'kind':'layer','text':item['text'],'rect':item['rect'],'font':item.get('font_label',item['font']),'size':item['size'],'max_size':item.get('max_size',item['size']),'color':item['color'],'lineheight':item.get('lineheight',1.2),'ascender':item.get('ascender',1.05),'descender':item.get('descender',-.3),'editable':item['editable'],'word_ids':[],'layer_id':item['id'],'min_height':item.get('min_height',fitz.Rect(item['rect']).height),'font_notice':item.get('font_notice'),'font_key':item.get('font_key')})
+            if item['type']=='text':output.append({'id':'layer:'+item['id'],'kind':'layer','text':item['text'],'rect':item['rect'],'font':item.get('font_label',item['font']),'size':item['size'],'max_size':item.get('max_size',item['size']),'color':item['color'],'lineheight':item.get('lineheight',1.2),'ascender':item.get('ascender',1.05),'descender':item.get('descender',-.3),'editable':item['editable'],'word_ids':[],'layer_id':item['id'],'min_height':item.get('min_height',fitz.Rect(item['rect']).height),'font_notice':item.get('font_notice'),'font_key':item.get('font_key'),'auto_width':item.get('auto_width',item.get('fixed_frame',False)) and not item.get('manual_width',False)})
         obstacles=layers.flow_obstacles(page)
         for target in output:
             if target['editable']:
-                single_line=target['kind']=='native' and len(next(g['origins'] for g in groups if g['rect']==target['rect']))==1
+                single_line=target.get('auto_width',False)
                 target['flow_rect']=layers.flow_rect(page,target['rect'],single_line,obstacles)
         return output
 
@@ -146,6 +147,6 @@ def replace_block(data,page_index,args,blocks=None,words=None):
     stripped=remove_block(data,page_index,block,words)
     if not text.strip():return stripped,None
     identity=block.get('layer_id')
-    result=layers.add(stripped,page_index,{'type':'text','id':identity,'text':text,'font':'source','font_label':block['font'],'font_notice':block.get('font_notice'),'size':block.get('max_size',block['size']),'max_size':block.get('max_size',block['size']),'color':block['color'],'rect':[block['rect'][0],block['rect'][1],block.get('flow_rect',block['rect'])[2],block['rect'][3]],'min_height':block.get('min_height',fitz.Rect(block['rect']).height),'lineheight':block['lineheight'],'ascender':block['ascender'],'descender':block['descender'],'fixed_frame':True},font_bytes=font_bytes)
+    result=layers.add(stripped,page_index,{'type':'text','id':identity,'text':text,'font':'source','font_label':block['font'],'font_notice':block.get('font_notice'),'size':block.get('max_size',block['size']),'max_size':block.get('max_size',block['size']),'color':block['color'],'rect':[block['rect'][0],block['rect'][1],block.get('flow_rect',block['rect'])[2],block['rect'][3]],'min_height':block.get('min_height',fitz.Rect(block['rect']).height),'lineheight':block['lineheight'],'ascender':block['ascender'],'descender':block['descender'],'fixed_frame':True,'auto_width':block.get('auto_width',True)},font_bytes=font_bytes)
     item=next(o for o in layers.inspect_layers(result,page_index) if o['id']==identity) if identity else layers.inspect_layers(result,page_index)[-1]
     return result,next(b for b in inspect_blocks(result,page_index) if b['id']=='layer:'+item['id'])

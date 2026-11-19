@@ -1,6 +1,6 @@
 # Verification report
 
-Release `prepared-downloads-8`, checked on 2026-11-18.
+Release `flow-accounts-9`, checked on 2026-11-19.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **87 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **92 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -114,3 +114,9 @@ Run `scripts/check_browser_multiple.py` against the local test server. It checks
 `check_browser_downloads.py` injects real network delay and verifies initial preparation, no loading overlay before upload, and zero new font/preview/analysis requests when selecting prepared paragraphs. It blocks programmatic blob clicks to exercise the persistent Save file link, waits beyond the former 1.5-second URL expiry, downloads and independently reopens the actual edited PDF. It also verifies that a failed export stops loading, shows an error and can be retried. Desktop and mobile layouts are covered.
 
 The backend patch test checks that text-free previews retain a coloured background and do not mutate the source PDF or undo history. Previews are cropped PNGs from the actual document with source characters removed. They are temporary display resources; exports continue to remove original source text and save real vector replacements.
+
+## Accounts, wrapping and continuous navigation
+
+`check_browser_accounts_scroll.py` uses the real web sign-in form without HTTP Basic credentials. It verifies a public landing page, tool gating, remembered sign-in on reload, logout, no inner text scrollbar, extra text wrapping/saving, automatic next-page activation from scrolling, visible download animation and independent reopening. Desktop and mobile layouts passed. `test_accounts_and_flow.py` covers owner isolation for reads and deletion, mixed-font line reflow, legacy narrow managed layers, public-key validation and cached verification of account-provider responses. Supabase response verification is tested with a local test fixture; production public registration requires the user's real project URL/key and has not been claimed as live before configuration.
+
+The same generated PDF was rechecked in Sejda and Folio on 2026-11-19: four identical edits were saved in both downloads at their original 16/18 pt sizes. The supplied private guide was tested only against the local editor.

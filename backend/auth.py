@@ -7,7 +7,7 @@ import secrets
 import time
 
 COOKIE_NAME = 'folio_preview_auth'
-COOKIE_TTL = 3600
+COOKIE_TTL = 30 * 24 * 3600
 
 def valid_basic(header, password):
     if not header.lower().startswith('basic '):

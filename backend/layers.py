@@ -3,7 +3,7 @@
 The metadata belongs to the object, so it survives saving/reopening. Deletion
 removes the drawing instruction and its resource, rather than hiding the object.
 """
-import io,json,math,re,uuid,hashlib
+import io,json,math,re,uuid,hashlib,unicodedata
 from functools import lru_cache
 from pathlib import Path
 import pikepdf
@@ -50,15 +50,14 @@ def text_style(args,font_bytes=None):
     text=str(args.get('text',''))
     if not text.strip() or len(text)>6000:raise ValueError('Enter text, up to 6000 characters. Spaces and new lines are supported.')
     if any(ord(c)<32 and c not in '\n\t' for c in text):raise ValueError('Unsupported control character.')
-    try:text.encode('cp1252')
-    except UnicodeError:raise ValueError('Text boxes currently support Western Latin characters. Other scripts need a compatible shaping/font engine.')
+    text=unicodedata.normalize('NFC',text)
+    if any(unicodedata.bidirectional(c) in ('R','AL','AN') for c in text):raise ValueError('This script needs a text shaping engine before it can be safely edited.')
     font=args.get('font','helv');size=float(args.get('size',16))
     if font not in FONTS and not(font=='source' and font_bytes):raise ValueError('Choose an available font.')
     if not math.isfinite(size) or not 4<=size<=144:raise ValueError('Font size must be 4–144 pt.')
-    if font_bytes:
-        face=fitz.Font(fontbuffer=font_bytes)
-        missing=next((c for c in text if not c.isspace() and not face.has_glyph(ord(c))),None)
-        if missing:raise ValueError(f'The original embedded font lacks {missing!r}. Remove that character or choose another font under Layers.')
+    face=fitz.Font(fontbuffer=font_bytes or font_buffer(font))
+    missing=next((c for c in text if not c.isspace() and not face.has_glyph(ord(c))),None)
+    if missing:raise ValueError(f'The chosen font lacks {missing!r}. Remove that character or choose another font under Layers.')
     return text.replace('\t','    '),font,size,rgb(args.get('color','#263449'))
 
 def text_height(text,width,size,font,font_bytes=None,lineheight=1.2):
@@ -189,7 +188,7 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                     if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
             elif draw_text(p,p.rect,text,font,size,color,font_bytes,lineheight)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
             meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449'),'font_key':hashlib.sha256(font_bytes or font_buffer(font)).hexdigest()[:20]})
-            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height','font_notice'):
+            for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height','font_notice','auto_width','manual_width'):
                 if key in args:meta[key]=args[key]
         elif kind=='image':
             rect=checked_rect(page,args['rect'])
@@ -239,6 +238,7 @@ def update(data,page_index,args):
     font_bytes=font_for_layer(data,page_index,old['id']) if old.get('font')=='source' and merged.get('font')=='source' else None
     if 'size' in args and old.get('fixed_frame'):merged['max_size']=args['size']
     if old.get('fixed_frame') and 'rect' in args and fitz.Rect(args['rect']).height!=fitz.Rect(old['rect']).height:merged['min_height']=fitz.Rect(args['rect']).height
+    if old.get('fixed_frame') and 'rect' in args and abs(fitz.Rect(args['rect']).width-fitz.Rect(old['rect']).width)>.1:merged['manual_width']=True
     if old['type']=='text' and not old.get('fixed_frame') and any(merged[k]!=old[k] for k in ('text','font','size')) and merged['rect']==old['rect']:
         text,font,size,_=text_style(merged);original=fitz.Rect(old['rect'])
         height=max(original.height,text_height(text,original.width,size,font))

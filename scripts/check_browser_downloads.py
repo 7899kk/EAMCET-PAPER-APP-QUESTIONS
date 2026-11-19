@@ -2,6 +2,7 @@
 import asyncio,json,os,re,shutil,sys,subprocess
 from pathlib import Path
 from playwright.async_api import async_playwright,expect
+from browser_helpers import sign_in
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 import pymupdf as fitz
 OUT=Path(__file__).resolve().parent.parent/'tests/artifacts/browser';OUT.mkdir(parents=True,exist_ok=True)
@@ -17,7 +18,7 @@ async def main():
   browser=await p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
   for mobile in [False,True]:
    ctx=await browser.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':960},is_mobile=mobile,has_touch=mobile,accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-   page=await ctx.new_page();errors=[];calls=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:calls.append(r.url))
+   await sign_in(ctx,BASE);page=await ctx.new_page();errors=[];calls=[];page.on('pageerror',lambda e:errors.append(str(e)));page.on('request',lambda r:calls.append(r.url))
    async def slow(route):await asyncio.sleep(.12);await route.continue_()
    await page.route('**/api/**',slow);await page.goto(BASE)
    assert await page.get_by_role('button',name='Download PDF',exact=True).count()==0
@@ -25,6 +26,7 @@ async def main():
    await page.locator('input[type=file]').first.set_input_files(source())
    await expect(page.locator('.page-preparing')).to_be_visible(timeout=10000);await expect(page.locator('.page-preparing')).to_have_count(0,timeout=40000)
    def editing_requests():return [u for u in calls if any(v in u for v in ['/font?','/edit-patch?','/pdf','/blocks']) and '/thumbnail' not in u]
+   await page.wait_for_function("()=>document.querySelector('.pdf-surface')?.dataset.prepared==='true'")
    before=len(editing_requests())
    await page.get_by_role('textbox',name='Edit paragraph: First editable paragraph.',exact=True).click()
    field=page.get_by_role('textbox',name='Edit text directly on PDF',exact=True);await expect(field).to_be_focused(timeout=3000)

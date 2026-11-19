@@ -112,3 +112,13 @@ The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. D
 ### Prepared display resources
 
 `GET /document/page/{page}/edit-patch?block=ID` returns a PNG of the selected text area's real background with original text removed. `X-Patch-Rect` contains its page-point rectangle. No PDF commit or history change occurs; the image is bounded to four million pixels. The frontend prepares these patches and font faces up front, reuses them across paragraph selections, and invalidates them for unrelated document operations/history. Browser preview cache is bounded to 96 entries / 16 MB; prepared font faces to 32 entries / 24 MB except an actively used face. Caches are per-document and cleared on close/replacement.
+
+## Accounts and continuous pages
+
+- `GET /api/auth/status`: public authentication mode, public Supabase configuration when enabled, and current user status. Never returns a secret/service-role key.
+- `POST /api/auth/login`: private workspace `{username,password,remember}`. Sets a signed HTTP-only SameSite=Strict cookie, for 30 days when remembered. Incorrect credentials are rejected and repeated failed attempts are limited.
+- `POST /api/auth/logout`: clears the private session and prevents cached browser Basic credentials from signing straight back in.
+- Supabase signup/sign-in/refresh use the official browser SDK. API requests send its access token as Bearer. The server verifies it against the configured project's user endpoint, caches verified identities briefly without retaining raw tokens, and binds document sessions to the verified user. Another user cannot read, edit, export or delete those documents even with their session token.
+- `GET /document/page/{page}/view`: bounded lazy PNG page preview for the continuous reader; it does not alter the PDF.
+
+`/signin` and `/signup` serve the app's account UI. The latter offers actual public registration only when Supabase is configured. Local mode without authentication variables remains usable for free on a developer's own machine.

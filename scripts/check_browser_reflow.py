@@ -2,6 +2,7 @@
 import asyncio,json,os,re,shutil,sys,subprocess
 from pathlib import Path
 from playwright.async_api import async_playwright,expect
+from browser_helpers import sign_in
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
 import pymupdf as fitz
 from backend import layers
@@ -22,7 +23,7 @@ async def main():
   browser=await p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
   for mobile in [False,True]:
    ctx=await browser.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':960},is_mobile=mobile,has_touch=mobile,accept_downloads=True,http_credentials={'username':'folio','password':os.environ.get('FOLIO_TEST_PASSWORD','browser-test-only')})
-   page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+   await sign_in(ctx,BASE);page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    await page.goto(BASE);await page.locator('input[type=file]').first.set_input_files(sample())
    await page.get_by_role('textbox',name=re.compile("^Edit paragraph: I'm feeling")).click()
    field=page.get_by_role('textbox',name='Edit text directly on PDF',exact=True);await expect(field).to_be_focused(timeout=20000)

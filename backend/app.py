@@ -15,7 +15,7 @@ from . import engine,content
 from .words import inspect_words
 from .shapes import inspect_shapes
 from .sample import sample_pdf
-from . import layers,ocr,blocks,images
+from . import layers,ocr,blocks,images,accounts
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
@@ -29,6 +29,7 @@ class Session:
     cursor:int=0
     touched:float=field(default_factory=time.time)
     name:str='document.pdf'
+    owner:str|None=None
     lock:threading.Lock=field(default_factory=threading.Lock)
     word_cache:OrderedDict=field(default_factory=OrderedDict)
     analysis_bytes:int=0
@@ -73,6 +74,7 @@ def get_session(token):
     with storage_lock:
         cleanup(); session=sessions.get(token)
         if session is None: raise HTTPException(404,'Session expired. Upload your PDF again.')
+        if session.owner is not None and accounts.identity.get()!=session.owner:raise HTTPException(404,'Session not found for this account.')
         session.touched=time.time(); return session
 
 def total_memory(): return sum(sum(len(v) for v in s.versions)+s.analysis_bytes for s in sessions.values())
@@ -111,7 +113,7 @@ def register(data,name):
     with storage_lock:
         cleanup()
         if total_memory()+len(data)>MAX_MEMORY: raise HTTPException(503,'Memory limit reached. Close another document and retry.')
-        token=secrets.token_urlsafe(32); sessions[token]=Session([data],name=Path(name or 'document.pdf').name)
+        token=secrets.token_urlsafe(32); sessions[token]=Session([data],name=Path(name or 'document.pdf').name,owner=accounts.identity.get())
     return token
 
 def commit(s,data):
@@ -144,13 +146,18 @@ def describe(s):
 async def guards(request,call_next):
     password=os.environ.get('FOLIO_PREVIEW_PASSWORD','')
     auth_header=request.headers.get('authorization','')
-    authenticated_basic=bool(password and valid_basic(auth_header,password))
-    if password and request.url.path != '/api/health':
-        authenticated=authenticated_basic if auth_header else valid_cookie(request.cookies.get(COOKIE_NAME,''),password)
-        if not authenticated:
-            return Response(json.dumps({'detail':'Your editor sign-in expired. Reload this page and sign in again.'}),
-                media_type='application/json',status_code=401,
-                headers={'WWW-Authenticate':'Basic realm="Folio PDF preview", charset="UTF-8"','Cache-Control':'no-store'})
+    authenticated_basic=bool(password and request.cookies.get('folio_signed_out')!='1' and valid_basic(auth_header,password))
+    private_ok=request.cookies.get('folio_signed_out')!='1' and (authenticated_basic or bool(password and valid_cookie(request.cookies.get(COOKIE_NAME,''),password)))
+    try:cfg=accounts.config()
+    except ValueError as exc:return Response(json.dumps({'detail':str(exc)}),status_code=503,media_type='application/json')
+    user_id='workspace' if private_ok else None
+    if cfg['mode']=='supabase' and auth_header.startswith('Bearer '):
+        try:
+            user=await run_in_threadpool(accounts.verify,auth_header[7:]);user_id=user['id'] if user else None
+        except ValueError as exc:return Response(json.dumps({'detail':str(exc)}),status_code=503,media_type='application/json')
+    public=request.url.path in ('/api/health','/api/auth/status','/api/auth/login','/api/auth/logout','/api/sample.pdf') or not request.url.path.startswith('/api/')
+    if cfg['mode']!='local' and not public and not user_id:
+        return Response(json.dumps({'detail':'Please sign in to use PDF tools.'}),media_type='application/json',status_code=401,headers={'Cache-Control':'no-store'})
     if request.method in ('POST','DELETE'):
         origin=request.headers.get('origin')
         expected_origin=(os.environ.get('FOLIO_PUBLIC_ORIGIN') or os.environ.get('RENDER_EXTERNAL_URL') or str(request.base_url)).rstrip('/')
@@ -158,14 +165,16 @@ async def guards(request,call_next):
             return Response('Cross-origin writes are not allowed.',status_code=403)
     length=request.headers.get('content-length')
     if length and int(length)>LIMIT+1024*1024: return Response('Upload exceeds 25 MB.',status_code=413)
-    response=await call_next(request)
-    if authenticated_basic:
+    identity_token=accounts.identity.set(user_id)
+    try:response=await call_next(request)
+    finally:accounts.identity.reset(identity_token)
+    if authenticated_basic and request.url.path!='/api/auth/logout':
         public_url=os.environ.get('FOLIO_PUBLIC_ORIGIN') or os.environ.get('RENDER_EXTERNAL_URL') or str(request.base_url)
         response.set_cookie(COOKIE_NAME,sign_cookie(password),max_age=COOKIE_TTL,
             httponly=True,secure=public_url.startswith('https://'),samesite='strict',path='/')
     response.headers['X-Content-Type-Options']='nosniff'; response.headers['Referrer-Policy']='no-referrer'
     if request.url.path.startswith('/api') or request.url.path=='/': response.headers['Cache-Control']='no-store'
-    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"
+    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' "+(cfg.get('url',''))+"; object-src 'none'; frame-ancestors 'none'"
     return response
 
 @app.exception_handler(KeyError)
@@ -183,8 +192,36 @@ async def read_file(file):
     if len(data)>LIMIT: raise HTTPException(413,'File exceeds 25 MB.')
     return data
 
+@app.get('/api/auth/status')
+def auth_status(request:Request):
+    cfg=accounts.config();password=os.environ.get('FOLIO_PREVIEW_PASSWORD','')
+    logged=bool(password and request.cookies.get('folio_signed_out')!='1' and (valid_basic(request.headers.get('authorization',''),password) or valid_cookie(request.cookies.get(COOKIE_NAME,''),password)))
+    return {**cfg,'user':{'id':'workspace','name':'Workspace member'} if logged else ({'id':accounts.identity.get(),'name':'Account member'} if accounts.identity.get() else None)}
+
+class LoginBody(BaseModel):
+    username:str=''
+    password:str=''
+    remember:bool=True
+
+@app.post('/api/auth/login')
+def auth_login(body:LoginBody,request:Request):
+    if not accounts.login_allowed(request.client.host if request.client else 'unknown'):raise HTTPException(429,'Too many sign-in attempts. Please wait five minutes.')
+    password=os.environ.get('FOLIO_PREVIEW_PASSWORD','')
+    if not password or body.username!='folio' or not secrets.compare_digest(body.password,password):raise HTTPException(401,'The username or password is incorrect.')
+    accounts.login_succeeded(request.client.host if request.client else 'unknown')
+    public_url=os.environ.get('FOLIO_PUBLIC_ORIGIN') or os.environ.get('RENDER_EXTERNAL_URL') or str(request.base_url)
+    ttl=COOKIE_TTL if body.remember else 3600
+    response=Response(json.dumps({'user':{'id':'workspace','name':'Workspace member'}}),media_type='application/json')
+    response.delete_cookie('folio_signed_out',path='/')
+    response.set_cookie(COOKIE_NAME,sign_cookie(password,int(time.time())+ttl),max_age=ttl,httponly=True,secure=public_url.startswith('https://'),samesite='strict',path='/')
+    return response
+
+@app.post('/api/auth/logout')
+def auth_logout():
+    response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
+
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'prepared-downloads-8','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'flow-accounts-9','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -228,6 +265,14 @@ def page_pdf(page:int,x_session:str=Header(...),exclude_block:str=''):
         if not 0<=page<len(doc):raise ValueError('Invalid page.')
         preview.insert_pdf(doc,from_page=page,to_page=page,links=False,widgets=False)
         return Response(preview.tobytes(garbage=3,deflate=True),media_type='application/pdf')
+
+@app.get('/api/document/page/{page}/view')
+def page_view(page:int,x_session:str=Header(...)):
+    s=get_session(x_session)
+    with fitz.open(stream=s.data,filetype='pdf') as doc:
+        if not 0<=page<len(doc):raise ValueError('Invalid page.')
+        p=doc[page];scale=min(1.25,(2_000_000/max(p.rect.get_area(),1))**.5)
+        return Response(p.get_pixmap(matrix=fitz.Matrix(scale,scale),alpha=False).tobytes('png'),media_type='image/png')
 
 @app.get('/api/document/page/{page}/edit-patch')
 def edit_patch(page:int,block:str,x_session:str=Header(...)):
@@ -384,6 +429,7 @@ def search(q:str,x_session:str=Header(...)):
 
 @app.delete('/api/document')
 def close(x_session:str=Header(...)):
+    get_session(x_session)
     with storage_lock:
         s=sessions.pop(x_session,None)
         if s and s.job:s.job['cancel'].set()
@@ -401,3 +447,8 @@ if DIST.exists():
     app.mount('/assets',StaticFiles(directory=DIST/'assets'),name='assets')
     @app.get('/')
     def index(): return FileResponse(DIST/'index.html')
+
+@app.get('/signin',include_in_schema=False)
+@app.get('/signup',include_in_schema=False)
+def account_page():
+    return FileResponse(Path(__file__).resolve().parent.parent/'frontend'/'dist'/'index.html')

@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `prepared-downloads-8`.
+Release `flow-accounts-9`.
 
 ## Click text and type
 
@@ -10,7 +10,7 @@ The original font size stays fixed while typing. On a supported single line, fol
 
 The original embedded TrueType/OpenType font, colour, starting position and line spacing are retained where supported. Standard fonts without embedded data use bundled compatible free fonts. Page edges, detected neighbouring text, images, graphics and containing panels limit expansion. If there is no room, saving fails explicitly and preserves your draft and the previous PDF. Resize/move the saved layer, manually choose a smaller size under Layers, or shorten the text. Separate paragraphs/images are not automatically pushed onto another page. Escape restores the last saved text; Ctrl/Cmd+Enter finishes editing. Enter inserts a line break.
 
-Before editing is enabled, the current page is rendered and its fonts and small text-free background patches are prepared. Selecting a prepared paragraph reuses those resources instead of fetching and rendering the whole page again. Preparation happens once per visited page; longer or more complex pages can take more time. Fonts and preview resources stay only in bounded per-document browser memory and are cleared when the document is closed or replaced.
+Reading and editing become available once the current page is rendered and its text is detected. Font faces and small text-free background patches warm up progressively in the background. Selecting a prepared paragraph reuses those resources instead of fetching and rendering the whole page again. Preparation is cached per document. It no longer blocks the first page until every preview has been prepared; longer or more complex pages can still take more time. Fonts and preview resources stay only in bounded per-document browser memory and are cleared when the document is closed or replaced.
 
 Background patches retain the original page's images, colours and graphics with just the selected source characters removed. They are temporary display resources, not white rectangles or substitutes for PDF processing. Autosave still commits real vector text into the actual PDF.
 
@@ -47,3 +47,13 @@ A generated sample was edited and downloaded from Sejda on 2026-11-17. Replacing
 Click **Make scanned text editable** on a scanned page, review the reconstruction notice, and start local OCR. The editable scan mode keeps raster artwork outside recognized text regions, replaces original recognized text pixels with sampled paper colour and inserts real editable text. Original fonts and textured/photo backgrounds are approximate. This differs from searchable OCR, which leaves scanned pixels unchanged, and the older text-only reconstruction, which discards artwork. Undo restores the original.
 
 Clicking another paragraph now waits for its predecessor's pending save, resolves current source IDs and preserves focus. Double-click selects a word; drag selects a range. See the [same-PDF Sejda comparison](../research/SEJDA_COMPARISON_2026_11_18.md).
+
+## Natural wrapping and continuous pages
+
+Text fields have no internal vertical scrollbar. Longer text wraps and expands visibly. Mixed-font segments at the same point size are combined into a line, with a notice that reflow uses its main font. Legacy narrow inline layers can widen into available space. Explicitly resized layers retain their chosen width. Nearby unrelated content and page boundaries still limit safe saving; a draft that cannot fit is retained with an error, rather than silently overlapping content.
+
+Scroll through the continuous page stack to see the next page automatically. Distant pages use lazy image previews; the active visible page loads the actual PDF and editable text. Pending edits are saved before activating another page. Download shows an indeterminate preparation animation, then starts the real file download and retains Save/Open links.
+
+## Sign-in and sign-up
+
+The landing page is public. Protected PDF tools require sign-in when authentication is configured. Private workspaces use a normal web form and an optional 30-day HTTP-only cookie; browser-native Basic password challenges are removed. Public email/password accounts use Supabase once the project URL and public key are configured. See [account setup](ACCOUNTS.md). No user account database is stored on Render's ephemeral filesystem.

@@ -127,12 +127,13 @@ def test_hosted_preview_auth_and_origin(client,monkeypatch):
  c=client
  monkeypatch.setenv('FOLIO_PREVIEW_PASSWORD','unit-test-only')
  monkeypatch.setenv('RENDER_EXTERNAL_URL','https://folio-test.example')
- assert c.get('/').status_code==401
+ assert c.get('/').status_code==200
+ assert 'www-authenticate' not in c.get('/').headers
  assert c.get('/api/health').status_code==200
  assert c.post('/api/documents',files={'file':('test.pdf',fixture())}).status_code==401
  auth=('folio','unit-test-only')
  assert c.get('/',auth=auth).status_code==200
- assert c.get('/',auth=('folio','wrong')).status_code==401
+ assert c.get('/',auth=('folio','wrong')).status_code==200
  good=c.post('/api/documents',auth=auth,headers={'Origin':'https://folio-test.example'},files={'file':('test.pdf',fixture())})
  assert good.status_code==200,good.text
  blocked=c.post('/api/documents',auth=auth,headers={'Origin':'https://other.example'},files={'file':('test.pdf',fixture())})
@@ -169,7 +170,7 @@ def test_preview_cookie_authenticates_browser_upload_without_basic_header(monkey
   token=upload.json()['token']
   assert c.get('/api/document/pdf',headers={'X-Session':token}).status_code==200
   assert c.post('/api/document/operation',headers={'X-Session':token,'Origin':'https://other.example'},json={'operation':'rotate'}).status_code==403
-  assert c.get('/',auth=('folio','wrong')).status_code==401
+  assert c.get('/',auth=('folio','wrong')).status_code==200
   c.cookies.clear()
   assert c.get('/api/document').status_code==401
  sessions.clear()

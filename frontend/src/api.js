@@ -1,3 +1,5 @@
+let tokenProvider=async()=>null;
+export function setTokenProvider(provider){tokenProvider=provider||(()=>Promise.resolve(null))}
 // Use the origin rather than the document URL: browsers reject fetch URLs
 // containing HTTP-login credentials, even when resolving a relative path.
 export function apiUrl(path, origin = window.location.origin) {
@@ -15,6 +17,8 @@ export async function fetchServer(path, options = {}) {
   const timeout=setTimeout(()=>{timedOut=true;controller.abort()},timeoutMs);
   let response;
   try {
+    const token=path.startsWith('/api/')&&!path.startsWith('/api/auth/')&&path!=='/api/health'?await tokenProvider():null;
+    if(token)requestOptions.headers={...requestOptions.headers,Authorization:'Bearer '+token};
     response = await fetch(apiUrl(path), { ...requestOptions, signal:controller.signal, credentials: 'same-origin' });
   } catch (error) {
     if(timedOut)throw new Error('The PDF server took too long to respond. Your saved changes are preserved. Retry; the free server may be waking up.');
@@ -22,7 +26,7 @@ export async function fetchServer(path, options = {}) {
     throw new Error('Could not reach the PDF server. Check your connection, then retry. If the free server is waking up, wait about a minute.');
   } finally {clearTimeout(timeout);signal?.removeEventListener('abort',abort)}
   if (response.status === 401) {
-    throw new Error('Your editor sign-in expired. Reload this page and sign in again.');
+    throw new Error('Please sign in again to continue. Your document has not been intentionally removed.');
   }
   return response;
 }
