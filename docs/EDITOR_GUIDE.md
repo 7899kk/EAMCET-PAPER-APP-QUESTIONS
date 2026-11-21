@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `flow-accounts-9`.
+Release `smooth-editing-10`.
 
 ## Click text and type
 
@@ -12,11 +12,11 @@ The original embedded TrueType/OpenType font, colour, starting position and line
 
 Reading and editing become available once the current page is rendered and its text is detected. Font faces and small text-free background patches warm up progressively in the background. Selecting a prepared paragraph reuses those resources instead of fetching and rendering the whole page again. Preparation is cached per document. It no longer blocks the first page until every preview has been prepared; longer or more complex pages can still take more time. Fonts and preview resources stay only in bounded per-document browser memory and are cleared when the document is closed or replaced.
 
-Background patches retain the original page's images, colours and graphics with just the selected source characters removed. They are temporary display resources, not white rectangles or substitutes for PDF processing. Autosave still commits real vector text into the actual PDF.
+Background patches retain the original page's images, colours and graphics with just the selected source characters removed. They are temporary display resources, not white rectangles or substitutes for PDF processing. Autosave commits real vector text into the actual PDF without reloading the canvas or regenerating the background while you type. Finishing editing refreshes the rendered page. Speculative preview preparation is limited to eight paragraphs so it competes less with active saves.
 
 **Download PDF** first saves pending text. If automatic downloading is blocked, use the persistent **Save file** link or **Open file** to open the prepared download. Links remain valid until dismissed, replaced, or invalidated by a new edit/document. Failed exports show an error and permit retry; they do not claim that a file was saved to your device.
 
-**Add text** also works directly: choose the tool, click a blank area, and type. It saves automatically. Use **Layers** for advanced font/colour changes, movement, resizing or deletion of saved text objects. Imported paragraphs keep their embedded font available in the layer controls.
+**Add text** also works directly: choose the tool, click a blank area, and type. An empty typing area shows “Type here…” and saves automatically. New text starts with a single-line minimum height and grows only as needed. Use **Layers** for advanced font/colour changes, movement, resizing or deletion of saved text objects. Imported paragraphs keep their embedded font available in the layer controls.
 
 ## Images and other content
 
@@ -57,3 +57,9 @@ Scroll through the continuous page stack to see the next page automatically. Dis
 ## Sign-in and sign-up
 
 The landing page is public. Protected PDF tools require sign-in when authentication is configured. Private workspaces use a normal web form and an optional 30-day HTTP-only cookie; browser-native Basic password challenges are removed. Public email/password accounts use Supabase once the project URL and public key are configured. See [account setup](ACCOUNTS.md). No user account database is stored on Render's ephemeral filesystem.
+
+## Zoom and OCR output
+
+New documents automatically fit the actual available workspace width. Fit page width uses that same container measurement. Manual plus/minus choices remain until Fit page width or another document is opened.
+
+For changing words in a scan, use **Editable scan** (approximate artwork retention) or **Editable text copy** (text only). Both outputs group recognized words into editable lines. **Searchable PDF** deliberately retains the scanned image and adds invisible search text; after it finishes, use **Make scanned text editable** to reconstruct visible editable text. Reconstruction supports Western Latin text; other scripts may remain searchable only.

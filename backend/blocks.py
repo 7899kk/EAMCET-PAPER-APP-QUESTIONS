@@ -96,8 +96,18 @@ def inspect_blocks(data,page_index,words=None):
         return output
 
 def find_block(data,page_index,identity,blocks=None):
+    if identity.startswith('layer:'):
+        return managed_block(data,page_index,identity[6:])
     block=next((b for b in (inspect_blocks(data,page_index) if blocks is None else blocks) if b['id']==identity),None)
     if not block or not block['editable']:raise ValueError('This paragraph changed or cannot be edited safely. Click it again.')
+    return block
+
+def managed_block(data,page_index,identity):
+    """Resolve our own text object without decoding every native text operand."""
+    item=next((m for m in layers.inspect_layers(data,page_index) if m['id']==identity and m['type']=='text'),None)
+    if not item or not item['editable']:raise ValueError('This paragraph changed or cannot be edited safely. Click it again.')
+    block={'id':'layer:'+item['id'],'kind':'layer','text':item['text'],'rect':item['rect'],'font':item.get('font_label',item['font']),'size':item['size'],'max_size':item.get('max_size',item['size']),'color':item['color'],'lineheight':item.get('lineheight',1.2),'ascender':item.get('ascender',1.05),'descender':item.get('descender',-.3),'editable':True,'word_ids':[],'layer_id':item['id'],'min_height':item.get('min_height',fitz.Rect(item['rect']).height),'font_notice':item.get('font_notice'),'font_key':item.get('font_key'),'auto_width':item.get('auto_width',item.get('fixed_frame',False)) and not item.get('manual_width',False)}
+    with fitz.open(stream=data,filetype='pdf') as doc:block['flow_rect']=layers.flow_rect(doc[page_index],block['rect'],block['auto_width'])
     return block
 
 def font_for_block(data,page_index,block):
@@ -149,4 +159,4 @@ def replace_block(data,page_index,args,blocks=None,words=None):
     identity=block.get('layer_id')
     result=layers.add(stripped,page_index,{'type':'text','id':identity,'text':text,'font':'source','font_label':block['font'],'font_notice':block.get('font_notice'),'size':block.get('max_size',block['size']),'max_size':block.get('max_size',block['size']),'color':block['color'],'rect':[block['rect'][0],block['rect'][1],block.get('flow_rect',block['rect'])[2],block['rect'][3]],'min_height':block.get('min_height',fitz.Rect(block['rect']).height),'lineheight':block['lineheight'],'ascender':block['ascender'],'descender':block['descender'],'fixed_frame':True,'auto_width':block.get('auto_width',True)},font_bytes=font_bytes)
     item=next(o for o in layers.inspect_layers(result,page_index) if o['id']==identity) if identity else layers.inspect_layers(result,page_index)[-1]
-    return result,next(b for b in inspect_blocks(result,page_index) if b['id']=='layer:'+item['id'])
+    return result,managed_block(result,page_index,item['id'])

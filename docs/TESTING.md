@@ -1,6 +1,6 @@
 # Verification report
 
-Release `flow-accounts-9`, checked on 2026-11-19.
+Release `smooth-editing-10`, checked on 2026-11-21.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **92 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **95 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -120,3 +120,11 @@ The backend patch test checks that text-free previews retain a coloured backgrou
 `check_browser_accounts_scroll.py` uses the real web sign-in form without HTTP Basic credentials. It verifies a public landing page, tool gating, remembered sign-in on reload, logout, no inner text scrollbar, extra text wrapping/saving, automatic next-page activation from scrolling, visible download animation and independent reopening. Desktop and mobile layouts passed. `test_accounts_and_flow.py` covers owner isolation for reads and deletion, mixed-font line reflow, legacy narrow managed layers, public-key validation and cached verification of account-provider responses. Supabase response verification is tested with a local test fixture; production public registration requires the user's real project URL/key and has not been claimed as live before configuration.
 
 The same generated PDF was rechecked in Sejda and Folio on 2026-11-19: four identical edits were saved in both downloads at their original 16/18 pt sizes. The supplied private guide was tested only against the local editor.
+
+## Stable autosave and OCR regression (release 10)
+
+`scripts/check_browser_save_stability.py` tests desktop and phone layouts with real API responses deliberately delayed by 900 ms. It verifies the latest text survives additional input during a pending save; autosave keeps the same canvas revision, caret focus and background patch; Add Text survives a pending first save and immediate download; auto-fit matches the actual workspace; searchable output offers reconstruction; both editable OCR modes permit two consecutive changes and reopen with those changes. A test-provider response delay does not replace PDF processing.
+
+`tests/test_edit_latency.py` verifies both OCR reconstructions produce an editable line and repeatable modifications, and asserts follow-up managed text saves no longer decode unrelated native PDF text operands. Editable OCR requests TSV recognition output only, avoiding an unused intermediate searchable PDF.
+
+The same generated two-page sample was edited in Sejda and Folio on 2026-11-21: selected `feeling` was replaced with `enthusiastic`, and three other lines changed. Both actual downloads independently reopened with all four changes and their 16/18 pt sizes. No user document was uploaded to Sejda. This comparison covers the ordinary editor; it does not establish equivalence with every Sejda feature or OCR mode.

@@ -7,19 +7,22 @@ from .layers import font_buffer,insert_unicode_font
 
 class Cancelled(Exception):pass
 
-def reconstruct(target,pix,rows,dpi):
+def reconstruct(target,pix,rows,dpi,preserve_artwork=True):
     """Lossy scan-to-editable conversion; original scan bytes are not retained.
 
     Keep raster artwork outside recognized glyph regions, erase recognized pixels
     using their sampled local paper colour, then insert real selectable line text.
     """
-    image=Image.frombytes('RGB',(pix.width,pix.height),pix.samples);draw=ImageDraw.Draw(image)
+    image=Image.frombytes('RGB',(pix.width,pix.height),pix.samples) if preserve_artwork else None
+    draw=ImageDraw.Draw(image) if image else None
     lines=collections.defaultdict(list)
     for row in rows:
         if float(row.get('conf',0))<25:continue
         text=row['text'].strip()
         try:text.encode('cp1252')
         except UnicodeError:raise ValueError('Editable OCR reconstruction currently supports Western Latin text. Choose searchable output for other scripts.')
+        lines[(row['block_num'],row['par_num'],row['line_num'])].append(row)
+        if not preserve_artwork:continue
         x,y,w,h=[int(row[k]) for k in ('left','top','width','height')]
         pad=2;box=(max(0,x-pad),max(0,y-pad),min(image.width,x+w+pad),min(image.height,y+h+pad))
         # Sample only outside the recognized pixels. Flat paper backgrounds are
@@ -29,8 +32,8 @@ def reconstruct(target,pix,rows,dpi):
             pixels.extend(image.getpixel((xx,yy)) for xx in range(box[0],box[2],max(1,w//40)))
         colour=collections.Counter(pixels).most_common(1)[0][0] if pixels else (255,255,255)
         draw.rectangle(box,fill=colour)
-        lines[(row['block_num'],row['par_num'],row['line_num'])].append(row)
-    buf=io.BytesIO();image.save(buf,format='PNG');target.insert_image(target.rect,stream=buf.getvalue())
+    if preserve_artwork:
+        buf=io.BytesIO();image.save(buf,format='PNG');target.insert_image(target.rect,stream=buf.getvalue())
     font=fitz.Font(fontbuffer=font_buffer('helv'));insert_unicode_font(target)
     for items in lines.values():
         items.sort(key=lambda r:int(r['left']));text=' '.join(r['text'].strip() for r in items)
@@ -62,7 +65,7 @@ def process(data,languages='eng',mode='searchable',indices=None,progress=lambda 
                 pix=page.get_pixmap(dpi=dpi,alpha=False)
                 with tempfile.TemporaryDirectory(prefix='folio-ocr-') as folder:
                     image=Path(folder)/'page.png';pix.save(image);dest=Path(folder)/'result'
-                    command=['tesseract',str(image),str(dest),'-l',languages,'--dpi',str(dpi),'pdf','tsv']
+                    command=['tesseract',str(image),str(dest),'-l',languages,'--dpi',str(dpi)]+(['pdf','tsv'] if mode=='searchable' else ['tsv'])
                     started=time.monotonic();child=subprocess.Popen(command,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
                     try:
                         while True:
@@ -81,15 +84,7 @@ def process(data,languages='eng',mode='searchable',indices=None,progress=lambda 
                     elif mode=='layout':
                         target=output.new_page(width=page.rect.width,height=page.rect.height);reconstruct(target,pix,rows,dpi)
                     else:
-                        target=output.new_page(width=page.rect.width,height=page.rect.height);font=fitz.Font(fontbuffer=font_buffer('helv'))
-                        insert_unicode_font(target)
-                        for row in rows:
-                            text=row['text'].strip()
-                            try:text.encode('cp1252')
-                            except UnicodeError:raise ValueError('Editable OCR copies currently support Western Latin text. Choose searchable PDF to preserve other languages.')
-                            x,y,w,h=[float(row[k])*72/dpi for k in ('left','top','width','height')]
-                            size=min(72,max(4,min(h/.75,w/max(font.text_length(text,fontsize=1),.01))))
-                            target.insert_text((x,min(target.rect.height-2,y+h-size*.1)),text,fontname='FolioText',fontsize=size)
+                        target=output.new_page(width=page.rect.width,height=page.rect.height);reconstruct(target,pix,rows,dpi,preserve_artwork=False)
                 del pix
             completed+=1;progress(completed,len(selected),f'Processed {completed} of {len(selected)} pages')
         check()

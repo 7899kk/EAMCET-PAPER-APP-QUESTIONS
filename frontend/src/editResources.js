@@ -38,7 +38,9 @@ export function createEditResources(getApi) {
  };
  const prepare=async(b,page)=>{const [f,p]=await Promise.all([font(b,page),b.id==='new'?Promise.resolve(null):patch(b,page)]);return {...f,patch:p}};
  const warm=async(blocks,page,progress,cancelled)=>{
-  const queue=blocks.filter(b=>b.editable);let index=0,done=0,failures=0,error='';progress(0,queue.length);
+  // Bound speculative native parsing/rasterization. Other paragraphs prepare on
+  // demand rather than competing with typing and autosaves on a small server.
+  const queue=blocks.filter(b=>b.editable).slice(0,8);let index=0,done=0,failures=0,error='';progress(0,queue.length);
   const worker=async()=>{while(index<queue.length&&!cancelled()){const b=queue[index++];try{await prepare(b,page)}catch(e){error=e.message;if(++failures>=3)index=queue.length}if(!cancelled())progress(++done,queue.length)}};
   await Promise.all([worker(),worker()]);return {failures,error};
  };

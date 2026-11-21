@@ -221,7 +221,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'flow-accounts-9','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'smooth-editing-10','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -330,8 +330,9 @@ async def inline_edit(body:OperationBody,x_session:str=Header(...)):
             ensure_idle(s)
             if args.get('id')=='new':
                 face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
-                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':'helv','font_label':'Sans','ascender':face.ascender,'descender':face.descender,'fixed_frame':True})
-                block=next(b for b in reversed(blocks.inspect_blocks(result,page)) if b['kind']=='layer')
+                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':'helv','font_label':'Sans','ascender':face.ascender,'descender':face.descender,'fixed_frame':True,'auto_width':False})
+                item=layers.inspect_layers(result,page)[-1];block=blocks.managed_block(result,page,item['id'])
+            elif str(args.get('id','')).startswith('layer:'):result,block=blocks.replace_block(s.data,page,args)
             else:result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))
             commit(s,result)
             return {**describe(s),'inline_block':block}
