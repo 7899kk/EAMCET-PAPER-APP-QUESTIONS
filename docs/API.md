@@ -7,6 +7,7 @@ Base URL: `http://127.0.0.1:8000/api`. Machine-readable schema: `GET /openapi.js
 | GET | `/health` | Engine health, installed OCR languages, upload/page limits |
 | GET | `/sample.pdf` | Generated editable sample PDF; uses the normal upload workflow |
 | POST | `/documents` | Multipart `file` PDF, optional `password`; returns token and document info |
+| POST | `/documents/blank` | Creates a real blank A4 PDF session; authentication required when enabled |
 | POST | `/images-to-pdf` | Multipart repeated `files`; returns a new document token |
 | GET | `/document` | Page dimensions/rotation, metadata, bytes, undo/redo availability |
 | GET | `/document/pdf` | Current actual PDF bytes |
@@ -122,3 +123,5 @@ The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. D
 - `GET /document/page/{page}/view`: bounded lazy PNG page preview for the continuous reader; it does not alter the PDF.
 
 `/signin` and `/signup` serve the app's account UI. The latter offers actual public registration only when Supabase is configured. Local mode without authentication variables remains usable for free on a developer's own machine.
+
+New inline text accepts a validated `font` code from the bundled 12 font/style choices. `GET /document/page/{page}/font?block=new&font=tiro` returns the matching browser font. Existing text editing keeps its original font handling.

@@ -1,4 +1,4 @@
-# Folio PDF editor
+# Edit karo PDF editor
 
 A local React + PDF.js workspace backed by real FastAPI, pikepdf/qpdf, PyMuPDF/MuPDF, and optional Tesseract processing. No paid API, subscription, external document service, or fake processing.
 
@@ -92,3 +92,5 @@ The landing page is public. Opening a PDF tool asks for sign-in when hosted auth
 Scroll through pages continuously; adjacent page previews load lazily and the visible page becomes editable. Inline text grows without an internal scrollbar, and mixed-font lines are grouped at the same point size. Editing a mixed-style line uses its main font. Export shows progress and retains fallback download links. Safe document boundaries still apply; the app does not reflow unrelated paragraphs or pages.
 
 Release 10 keeps autosave independent of canvas refresh, groups editable OCR words into lines, provides a visible Add Text prompt, and automatically fits new documents to the workspace. Searchable OCR keeps scan pixels; choose an editable OCR output to change recognized text. See [the editing guide](docs/EDITOR_GUIDE.md).
+
+Start from the normal PDF uploader or the small **Start with a blank PDF** link (one A4 page). Add Text stays active for multiple independent boxes. Choose among 12 bundled Sans, Serif and Monospace faces/styles; use Move / resize / style box to select the saved object, drag it, resize its corner, change its font/size, or delete it. PDF images can be inserted into a blank document and recognized with editable OCR.

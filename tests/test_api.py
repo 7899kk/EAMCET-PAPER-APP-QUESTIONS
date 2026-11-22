@@ -114,7 +114,7 @@ def test_active_content_removed():
 
 def test_built_frontend_assets(client):
  import re
- c=client; response=c.get('/'); assert response.status_code==200;assert '<title>Folio' in response.text
+ c=client; response=c.get('/'); assert response.status_code==200;assert '<title>Edit karo' in response.text
  scripts=re.findall(r'(?:src|href)="(/assets/[^"]+)"',response.text)
  assert scripts
  for path in scripts:

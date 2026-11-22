@@ -58,7 +58,7 @@ def process(data,languages='eng',mode='searchable',indices=None,progress=lambda 
                 output.insert_pdf(source,from_page=i,to_page=i);continue
             progress(completed,len(selected),f'Reading page {i+1} of {len(source)}…')
             existing=page.get_text().strip()
-            if existing and mode=='searchable':
+            if existing and mode=='searchable' and not page.get_image_info():
                 output.insert_pdf(source,from_page=i,to_page=i);recognized+=len(existing.split())
             else:
                 dpi=max(72,min(180,int(72*math.sqrt(8_000_000/page.rect.get_area()))))

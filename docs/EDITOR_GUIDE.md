@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `smooth-editing-10`.
+Release `text-boxes-11` — Edit karo.
 
 ## Click text and type
 
@@ -63,3 +63,13 @@ The landing page is public. Protected PDF tools require sign-in when authenticat
 New documents automatically fit the actual available workspace width. Fit page width uses that same container measurement. Manual plus/minus choices remain until Fit page width or another document is opened.
 
 For changing words in a scan, use **Editable scan** (approximate artwork retention) or **Editable text copy** (text only). Both outputs group recognized words into editable lines. **Searchable PDF** deliberately retains the scanned image and adds invisible search text; after it finishes, use **Make scanned text editable** to reconstruct visible editable text. Reconstruction supports Western Latin text; other scripts may remain searchable only.
+
+## Blank documents and text boxes
+
+The landing page keeps the normal uploader and adds a small **Start with a blank PDF** link. It creates a real blank A4 PDF on the processing backend. Insert images, add text or use other tools, then download normally.
+
+Add Text remains selected after placement. Click an empty area, type, then click another empty area to create a separate box, including before the first autosave finishes. The **Next text box** toolbar offers 12 bundled font/style choices, size and colour. It sets the style for the next placement. Existing boxes have independent properties.
+
+Choose **Move / resize / style box** above the active box to save it and reveal its selection controls. Drag the saved box to move it, drag its corner to resize the frame, or change font and size using **Apply layer changes**. Frame resizing reflows text; font size changes enlarge or shrink the letters. Both are saved in the PDF. Select another saved box or use **Add another text box** to place more.
+
+OCR scans pages containing both native text and images; searchable mode no longer skips an entire image-containing page just because it already has a selectable heading. Mixed-page searchable conversion rasterizes the rendered appearance and supplies a recognized text layer; review recognition, since it does not retain that page's original text/font structures. Editable scan reconstruction also has the disclosed artwork/font limitations. No OCR engine can guarantee recognition of every glyph in a blurry or low-resolution image.

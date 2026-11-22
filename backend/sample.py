@@ -11,5 +11,5 @@ def sample_pdf():
         page.insert_text((52, 212), '3. Select the shape to move, resize, recolour or delete it.', fontsize=12)
         page.insert_text((52, 239), '4. Download the PDF and reopen it to check your changes.', fontsize=12)
         page.insert_text((52, 300), 'Space for your shapes:', fontsize=14)
-        doc.set_metadata({'title': 'Folio editable sample', 'author': 'Folio'})
+        doc.set_metadata({'title': 'Edit karo editable sample', 'author': 'Edit karo'})
         return doc.tobytes(garbage=4, deflate=True)

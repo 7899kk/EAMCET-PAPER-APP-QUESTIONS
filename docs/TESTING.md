@@ -1,6 +1,6 @@
 # Verification report
 
-Release `smooth-editing-10`, checked on 2026-11-21.
+Release `text-boxes-11`, checked on 2026-11-22.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **95 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **101 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -128,3 +128,9 @@ The same generated PDF was rechecked in Sejda and Folio on 2026-11-19: four iden
 `tests/test_edit_latency.py` verifies both OCR reconstructions produce an editable line and repeatable modifications, and asserts follow-up managed text saves no longer decode unrelated native PDF text operands. Editable OCR requests TSV recognition output only, avoiding an unused intermediate searchable PDF.
 
 The same generated two-page sample was edited in Sejda and Folio on 2026-11-21: selected `feeling` was replaced with `enthusiastic`, and three other lines changed. Both actual downloads independently reopened with all four changes and their 16/18 pt sizes. No user document was uploaded to Sejda. This comparison covers the ordinary editor; it does not establish equivalence with every Sejda feature or OCR mode.
+
+## Blank PDF and text-box regression (release 11)
+
+`scripts/check_browser_text_boxes.py` passes desktop and phone layouts: start from a backend-created blank PDF; create two independent text boxes before the first save timer; choose Serif, then change one saved box to Monospace; enlarge and shrink its font; drag and resize the box; create a third box in Sans Bold; download and independently reopen the PDF, checking all three objects, fonts, sizes and moved coordinates. It then inserts an actual image into the document, runs editable OCR and edits its recognized text, downloads and reopens it.
+
+`tests/test_blank_and_boxes.py` checks blank PDF validity and image insertion, repeated native inline boxes in three font families, real saved geometry/font changes, and mixed-page image text recognition in both searchable and editable-scan OCR. The ordinary frontend asset test now checks the requested Edit karo page title.

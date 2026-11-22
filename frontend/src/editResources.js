@@ -12,7 +12,7 @@ export function createEditResources(getApi) {
   entry.promise=(async()=>{
    let compatible=!!b.font_fallback;
    for(let attempt=0;attempt<2;attempt++){
-    const r=await getApi()(`/document/page/${page}/font?block=${encodeURIComponent(b.id)}${compatible?'&compatible=true':''}`,{timeoutMs:20000});
+    const r=await getApi()(`/document/page/${page}/font?block=${encodeURIComponent(b.id)}${compatible?'&compatible=true':''}${b.id==='new'?'&font='+encodeURIComponent(b.creation_font||'helv'):''}`,{timeoutMs:20000});
     const buffer=await r.arrayBuffer(),asc=Number(r.headers.get('X-Font-Ascender'))||b.ascender,desc=Number(r.headers.get('X-Font-Descender'))||b.descender;
     try{
      const face=new FontFace('folio-prepared-'+(++serial),buffer,{ascentOverride:`${asc*100}%`,descentOverride:`${Math.abs(desc)*100}%`,lineGapOverride:'0%'});await face.load();

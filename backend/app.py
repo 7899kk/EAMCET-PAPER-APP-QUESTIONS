@@ -61,7 +61,7 @@ class ExportBody(BaseModel):
     kind:str='pdf'
     args:dict=Field(default_factory=dict)
 
-app=FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,title='Folio PDF API',version='1.0.0',description='Local PDF processing. Session IDs are bearer secrets. Documents expire after one idle hour.')
+app=FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,title='Edit karo PDF API',version='1.0.0',description='Local PDF processing. Session IDs are bearer secrets. Documents expire after one idle hour.')
 
 def cleanup():
     now=time.time()
@@ -221,7 +221,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'smooth-editing-10','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'text-boxes-11','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -231,6 +231,14 @@ def sample():
 async def upload(file:UploadFile=File(...),password:str=Form('')):
     data=await read_file(file); clean=await run_in_threadpool(engine.validate,data,password)
     token=register(clean,file.filename)
+    return {'token':token,**describe(get_session(token))}
+
+@app.post('/api/documents/blank')
+def blank_document():
+    with fitz.open() as doc:
+        doc.new_page(width=595,height=842)
+        doc.set_metadata({'title':'Untitled — Edit karo'})
+        token=register(doc.tobytes(),'Untitled.pdf')
     return {'token':token,**describe(get_session(token))}
 
 @app.post('/api/images-to-pdf')
@@ -313,12 +321,13 @@ def text_blocks(page:int,x_session:str=Header(...)):
         return {'blocks':targets,'ocr_recommended':images and not any(b['editable'] for b in targets)}
 
 @app.get('/api/document/page/{page}/font')
-def block_font(page:int,block:str,x_session:str=Header(...),compatible:bool=False):
+def block_font(page:int,block:str,x_session:str=Header(...),compatible:bool=False,font:str='helv'):
     s=get_session(x_session)
     with s.lock:
         if block=='new':
-            face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
-            return Response(layers.font_buffer('helv'),media_type='application/octet-stream',headers={'X-Font-Ascender':str(face.ascender),'X-Font-Descender':str(face.descender)})
+            if font not in layers.FONTS:raise ValueError('Choose an available font.')
+            face=fitz.Font(fontbuffer=layers.font_buffer(font))
+            return Response(layers.font_buffer(font),media_type='application/octet-stream',headers={'X-Font-Ascender':str(face.ascender),'X-Font-Descender':str(face.descender)})
         selected=blocks.find_block(s.data,page,block,page_blocks(s,page));data=layers.font_buffer(blocks.compatible_font(selected['font'])) if compatible else blocks.font_for_block(s.data,page,selected)
         return Response(data,media_type='application/octet-stream')
 
@@ -329,8 +338,10 @@ async def inline_edit(body:OperationBody,x_session:str=Header(...)):
         with s.lock:
             ensure_idle(s)
             if args.get('id')=='new':
-                face=fitz.Font(fontbuffer=layers.font_buffer('helv'))
-                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':'helv','font_label':'Sans','ascender':face.ascender,'descender':face.descender,'fixed_frame':True,'auto_width':False})
+                font=args.get('font','helv')
+                if font not in layers.FONTS:raise ValueError('Choose an available font.')
+                face=fitz.Font(fontbuffer=layers.font_buffer(font))
+                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':font,'font_label':font,'ascender':face.ascender,'descender':face.descender,'fixed_frame':True,'auto_width':False})
                 item=layers.inspect_layers(result,page)[-1];block=blocks.managed_block(result,page,item['id'])
             elif str(args.get('id','')).startswith('layer:'):result,block=blocks.replace_block(s.data,page,args)
             else:result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))

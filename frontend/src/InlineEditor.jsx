@@ -32,7 +32,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
   const a=current.current;if(!a||draft.current===saved.current)return true;
   const text=draft.current;if(!final&&!text.trim())return true;warmTicket.current++;setStatus('Saving…');
   const job=(async()=>{try{
-   const result=await(await api('/document/inline-edit',{method:'POST',body:JSON.stringify({operation:'replace-block',args:{page:a.page,id:a.id,original:saved.current,text,rect:a.rect,size:a.size,color:a.color,font_fallback:!!a.font_fallback}})})).json();
+   const result=await(await api('/document/inline-edit',{method:'POST',body:JSON.stringify({operation:'replace-block',args:{page:a.page,id:a.id,original:saved.current,text,rect:a.rect,size:a.size,color:a.color,font_fallback:!!a.font_fallback,font:a.creation_font||'helv'}})})).json();
    if(current.current?.editSession!==a.editSession)return true;
    saved.current=result.inline_block?.text??text;commits.current++;
    // Keep the text-free background and caret stable throughout typing. Saving
@@ -52,7 +52,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
  const activate=async(block,point=null)=>{
   if(point){const host=document.querySelector('.pdf-surface')?.getBoundingClientRect();if(host&&point.zoom)point={...point,pdfX:(point.x-host.x)/point.zoom,pdfY:(point.y-host.y)/point.zoom}}
   if(!block.editable){setError(block.reason||'This text structure needs OCR or reconstruction.');return}
-  if(current.current?.id===block.id&&!current.current.closing){if(point?.clicks>1){selectionIntent.current={...point,word:true};if(!switching.current)placeSelection()}return}
+  if(block.id!=='new'&&current.current?.id===block.id&&!current.current.closing){if(point?.clicks>1){selectionIntent.current={...point,word:true};if(!switching.current)placeSelection()}return}
   const ticket=++navigation.current;switching.current=true;element.current?.blur();
   const refreshNeeded=!!flight.current||draft.current!==saved.current||analysisCommit.current!==commits.current;
   if(point)selectionIntent.current={...point,word:point.clicks>1};
@@ -91,9 +91,9 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
   window.addEventListener('pointermove',move);window.addEventListener('pointerdown',down,true);window.addEventListener('dblclick',double,true);
   return()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerdown',down,true);window.removeEventListener('dblclick',double,true)};
  },[]);
- const createAt=(point,size=16,color='#263449')=>{
+ const createAt=(point,size=16,color='#263449',font='helv')=>{
   if(point.width-point.x<32||point.height-point.y<size*1.5+4){setError('Click further inside the page to leave room for your text.');return false}
-  activate({id:'new',kind:'new',text:'',rect:[point.x,point.y,Math.min(point.x+320,point.width-12),point.y+size*1.5],font:'Sans',size,color,lineheight:1.2,ascender:1.05,descender:-.3,editable:true});return true;
+  activate({id:'new',kind:'new',text:'',rect:[point.x,point.y,Math.min(point.x+320,point.width-12),point.y+size*1.5],font,creation_font:font,font_key:'new:'+font,size,color,lineheight:1.2,ascender:1.05,descender:-.3,editable:true});return true;
  };
  useLayoutEffect(()=>{
   if(active?.closing&&canvasReady&&current.current?.editSession===active.editSession&&current.current?.closing){current.current=null;setActive(null);setPatch(null);setMasked(false);resources.current.pin('');setStatus('All changes saved')}
@@ -112,14 +112,15 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
   setStatus('Editing…');clearTimeout(timer.current);timer.current=setTimeout(()=>save(),550);
  };
  const revert=()=>{clearTimeout(timer.current);setError('');draft.current=saved.current;if(element.current)element.current.textContent=saved.current;if(current.current)current.current.error=null;finish()};
- return {blocks,ready:ready&&canvasPageReady,needsOcr,active,face,masked,patch,progress,status,element,activate,createAt,input,save,finish,blur,revert,get dirty(){return draft.current!==saved.current}};
+ return {blocks,ready:ready&&canvasPageReady,needsOcr,active,face,masked,patch,progress,status,element,activate,createAt,input,save,finish,blur,revert,get layerId(){return current.current?.layer_id},get dirty(){return draft.current!==saved.current}};
 }
 
-export function InlineText({model:m,zoom}) {
+export function InlineText({model:m,zoom,boxed=false,onManage,targets=true}) {
  const a=m.active,show=a&&m.face&&m.masked;
  return <>
   {a&&m.patch&&<img className="edit-background-patch" alt="" draggable={false} src={m.patch.url} style={{left:m.patch.rect[0]*zoom,top:m.patch.rect[1]*zoom,width:(m.patch.rect[2]-m.patch.rect[0])*zoom,height:(m.patch.rect[3]-m.patch.rect[1])*zoom}}/>}
-  {(m.ready?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.preventDefault();e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail,zoom})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
+  {(m.ready&&targets?m.blocks:[]).filter(b=>b.id!==a?.id).map(b=><div key={b.id} role="textbox" tabIndex={b.editable?0:-1} aria-label={'Edit paragraph: '+b.text.slice(0,85)} aria-readonly={!b.editable} className={'paragraph-hit '+(!b.editable?'paragraph-readonly':'')} style={{left:b.rect[0]*zoom,top:b.rect[1]*zoom,width:(b.rect[2]-b.rect[0])*zoom,height:(b.rect[3]-b.rect[1])*zoom}} onPointerDown={e=>{e.preventDefault();e.stopPropagation();m.activate(b,{x:e.clientX,y:e.clientY,clicks:e.detail,zoom})}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();m.activate(b)}}}/>) }
+  {a&&boxed&&<div className="active-text-frame" style={{left:a.rect[0]*zoom,top:a.rect[1]*zoom,width:((a.flow_rect||a.rect)[2]-a.rect[0])*zoom,height:Math.max(a.rect[3]-a.rect[1],a.size*1.5)*zoom}}><button type="button" onPointerDown={e=>{e.preventDefault();e.stopPropagation()}} onClick={e=>{e.stopPropagation();onManage()}}>Move / resize / style box</button></div>}
   {a&&<div ref={m.element} data-zoom={zoom} data-placeholder={a.id==='new'?'Type here…':undefined} role="textbox" aria-label="Edit text directly on PDF" aria-multiline="true" contentEditable={!a.closing} suppressContentEditableWarning spellCheck={false} className={'inline-text '+(a.error?'inline-error':'')} style={{left:a.rect[0]*zoom,top:(a.rect[1]+((a.ascender-a.descender-a.lineheight)*a.size)/2)*zoom,width:((a.flow_rect||a.rect)[2]-a.rect[0])*zoom,minHeight:(a.rect[3]-a.rect[1])*zoom,overflow:'visible',fontFamily:m.face||'sans-serif',fontSize:(a.max_size||a.size)*zoom,lineHeight:a.lineheight,color:a.color,opacity:show?1:0,pointerEvents:a.closing?'none':'auto'}} onInput={m.input} onPointerDown={e=>e.stopPropagation()} onBlur={()=>m.blur()} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();m.revert()}if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();m.finish()}}} onPaste={e=>{e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain').replace(/\t/g,'    '))}}/>}
  </>;
 }
