@@ -97,3 +97,5 @@ Release 10 keeps autosave independent of canvas refresh, groups editable OCR wor
 
 Start from the normal PDF uploader or the small **Start with a blank PDF** link (one A4 page). Add Text stays active for multiple independent boxes. Choose among 12 bundled Sans, Serif and Monospace faces/styles; use Move / resize / style box to select the saved object, drag it, resize its corner, change its font/size, or delete it. PDF images can be inserted into a blank document and recognized with editable OCR.
 Add Text now has a contextual toolbar beside the active text for font, size, bold, italic, colour, moving, duplicating and deleting. Drag its Move grip or corner directly; changes autosave without a separate Layers/Apply step. See research/SEJDA_ADD_TEXT_CHECK.md for the actual comparison.
+
+**Edit Metadata** and **Clear Metadata** are in All tools, with Edit Metadata also in the header. Standard properties, dates and custom properties are editable; standard fields synchronize with XMP. Clearing removes Info/XMP while preserving pages, comments and editing layers. See the metadata guide and same-PDF Sejda comparison.

@@ -5,7 +5,7 @@ from PIL import Image
 from .content import replace,inspect
 from .words import replace_word
 from . import shapes
-from . import layers,images
+from . import layers,images,metadata
 from .readable import replace_readable
 
 MAX_PAGES=300
@@ -47,6 +47,8 @@ def rect_for(page,coords):
     return rect
 
 def apply(data,op,args,extra=None,word_targets=None):
+    if op=='metadata':return metadata.edit(data,args.get('metadata',{}),args.get('custom'))
+    if op=='clear-metadata':return metadata.clear(data)
     page_index=int(args.get('page',0))
     if op=='replace-readable':return replace_readable(data,page_index,args,word_targets)
     if op in ('text','stamp'):return layers.add(data,page_index,{**args,'type':'text'})
@@ -110,9 +112,6 @@ def apply(data,op,args,extra=None,word_targets=None):
             for i,p in enumerate(doc):
                 if op=='numbers': p.insert_text((p.rect.width/2-8,p.rect.height-25),str(i+1),fontsize=11,color=color)
                 else: p.insert_text((40,p.rect.height/2),str(args.get('text','DRAFT'))[:100],fontsize=min(size,60),color=color,fill_opacity=.25)
-        elif op=='metadata':
-            allowed={'title','author','subject','keywords','creator','producer'}
-            metadata=doc.metadata.copy(); metadata.update({k:str(v)[:2000] for k,v in args.get('metadata',{}).items() if k in allowed}); doc.set_metadata(metadata)
         elif op=='compress': pass
         elif op=='ocr':
             langs=str(args.get('languages','eng'))

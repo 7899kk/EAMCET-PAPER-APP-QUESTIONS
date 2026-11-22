@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `direct-text-13` — Edit karo.
+Release `metadata-14` — Edit karo.
 
 ## Click text and type
 
@@ -81,3 +81,11 @@ Click Add Text, click a blank page area and type. The selected text shows a comp
 Click another empty area to place another box. Click a saved added-text box to edit it and restore its toolbar. Duplicate creates a separate saved object; Delete removes that object's PDF content. Advanced Layers controls remain available for images, brush strokes and other objects.
 
 See [the observed Sejda behavior](../research/SEJDA_ADD_TEXT_CHECK.md). This supersedes the earlier Move / resize / style and Apply instructions for Add Text.
+
+## Edit and clear metadata
+
+Use **Edit Metadata** in the workspace header or All tools. Title, Author, Subject and Keywords appear first. Advanced properties contains Creator, Producer, Creation date and Modified date. Dates use ISO 8601, for example 2024-01-02T12:00:00Z. Custom properties can be added, edited or removed. Save metadata writes the PDF, keeping standard Info/XMP values consistent.
+
+**Clear Metadata** is a separate All tools action and is available in the editor. It removes standard/custom document properties and XMP, with Undo in the session. It preserves pages, comments (including authors) and editing layers. This does not redact visible text or anonymize every other kind of document content.
+
+See [the actual Sejda comparison](../research/SEJDA_METADATA_CHECK.md).

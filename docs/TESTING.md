@@ -1,6 +1,6 @@
 # Verification report
 
-Release `direct-text-13`, checked on 2026-11-22.
+Release `metadata-14`, checked on 2026-11-22.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **105 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **114 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -144,3 +144,9 @@ Sign-in UI is removed. Public-mode API tests verify upload, blank PDF creation, 
 check_browser_direct_text.py checks formatting without a Layers/Apply step, drag, frame resize, copy/delete, repeated placement, reselecting a saved box, and font/size/colour changes with delayed save responses. It independently reopens exports and checks content, actual fonts, point sizes and geometry. test_direct_text.py verifies combined text/style/geometry writes and rejects stale originals. The earlier text-box browser entry point forwards to this current workflow.
 
 The direct-text browser test also exports while a newly chosen font response is deliberately delayed. It verifies the PDF contains that font and that the editor remains closed after the late response. Formatting controls retain focus when fonts finish loading.
+
+## Metadata (release 14)
+
+Nine metadata tests cover standard/custom editing, synchronized Info/XMP, XMP-only properties, invalid dates/control characters/keys with rollback, complete Info/catalog/page/object XMP removal, unchanged pixels/text/layers/comments, and export plus Undo/Redo. The full suite passed 114 tests including the optional supplied-document fixture.
+
+check_browser_metadata.py passed desktop 1440×1000 and mobile 390×844 for standard/custom/date fields, both tool entry points, clearing, undo, actual exports and reupload. Exports were inspected with pikepdf and MuPDF; pixels/text stayed identical. The same generated input was processed by Sejda; see research/SEJDA_METADATA_CHECK.md and the independent JSON report.

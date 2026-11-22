@@ -15,7 +15,7 @@ from . import engine,content
 from .words import inspect_words
 from .shapes import inspect_shapes
 from .sample import sample_pdf
-from . import layers,ocr,blocks,images,accounts
+from . import layers,ocr,blocks,images,accounts,metadata
 from .auth import COOKIE_NAME,COOKIE_TTL,valid_basic,valid_cookie,sign_cookie
 
 LIMIT=25*1024*1024
@@ -222,7 +222,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'direct-text-13','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'metadata-14','edit_metadata':True,'clear_metadata':True,'inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -260,6 +260,10 @@ async def images_to_pdf(files:list[UploadFile]=File(...)):
 
 @app.get('/api/document')
 def info(x_session:str=Header(...)): return describe(get_session(x_session))
+
+@app.get('/api/document/metadata')
+def document_metadata(x_session:str=Header(...)):
+    return metadata.inspect(get_session(x_session).data)
 
 @app.get('/api/document/pdf')
 def pdf(x_session:str=Header(...)): return Response(get_session(x_session).data,media_type='application/pdf')

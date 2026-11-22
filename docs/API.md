@@ -127,3 +127,9 @@ The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. D
 New inline text accepts a validated `font` code from the bundled 12 font/style choices. `GET /document/page/{page}/font?block=new&font=tiro` returns the matching browser font. Existing text editing keeps its original font handling.
 
 Inline edits of managed added text accept an optional box_style object (font, size, color, rect). Text and style are committed together after validating the submitted original text. New text also honors these properties on its first save. Deleting text still removes the actual object. This powers the contextual toolbar without client-only transformations.
+
+## Document metadata
+
+GET /document/metadata returns standard fields (including XMP-only properties), custom string properties and an XMP-packet count. POST /document/operation with operation metadata accepts args.metadata (title, author, subject, keywords, creator, producer, creationDate, modDate) and optional args.custom. Standard edits synchronize Info and XMP. Dates accept ISO 8601 or PDF dates; timezone-free new dates use UTC. Empty standard values remove entries. Values are limited to 2000 characters and custom properties to 50.
+
+Operation clear-metadata removes Info and document/page/object Metadata associations, rewriting the PDF without incremental metadata history. Pages, comments and editable objects remain. Both operations use the existing session, Undo/Redo and export APIs.
