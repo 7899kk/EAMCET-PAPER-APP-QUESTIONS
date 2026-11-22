@@ -134,3 +134,7 @@ The same generated two-page sample was edited in Sejda and Folio on 2026-11-21: 
 `scripts/check_browser_text_boxes.py` passes desktop and phone layouts: start from a backend-created blank PDF; create two independent text boxes before the first save timer; choose Serif, then change one saved box to Monospace; enlarge and shrink its font; drag and resize the box; create a third box in Sans Bold; download and independently reopen the PDF, checking all three objects, fonts, sizes and moved coordinates. It then inserts an actual image into the document, runs editable OCR and edits its recognized text, downloads and reopens it.
 
 `tests/test_blank_and_boxes.py` checks blank PDF validity and image insertion, repeated native inline boxes in three font families, real saved geometry/font changes, and mixed-page image text recognition in both searchable and editable-scan OCR. The ordinary frontend asset test now checks the requested Edit karo page title.
+
+## Public access (release 12)
+
+Sign-in UI is removed. Public-mode API tests verify upload, blank PDF creation, native text editing and PDF export without cookies, even with legacy password/Supabase configuration present. The desktop/mobile text-box and image OCR browser workflow can run without signing in using `FOLIO_TEST_PUBLIC=1`. Optional private supplied-document test is skipped unless its local path is provided.

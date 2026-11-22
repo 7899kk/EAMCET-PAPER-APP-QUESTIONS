@@ -17,7 +17,9 @@ async def main():
   b=await p.chromium.launch(executable_path=shutil.which('chromium'),args=['--no-sandbox'])
   for mobile in [False,True]:
    ctx=await b.new_context(viewport={'width':390,'height':844} if mobile else {'width':1440,'height':1000},is_mobile=mobile,has_touch=mobile,accept_downloads=True)
-   await sign_in(ctx,BASE);page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));await page.goto(BASE)
+
+   if os.environ.get('FOLIO_TEST_PUBLIC')!='1':await sign_in(ctx,BASE)
+   page=await ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));await page.goto(BASE)
    assert 'Edit karo' in await page.title()
    await page.get_by_role('button',name='Start with a blank PDF',exact=True).click()
    surface=page.locator('.pdf-surface');await expect(surface).to_have_class(re.compile('tool-text'),timeout=20000)

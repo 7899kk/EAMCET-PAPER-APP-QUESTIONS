@@ -1,5 +1,7 @@
 # Edit karo PDF editor
 
+Current release: sign-in has been removed from Edit karo. The Docker deployment sets `EDIT_KARO_PUBLIC_ACCESS=1`, which takes precedence over old password or Supabase settings. Visitors can upload, create blank PDFs, edit and download directly. Temporary document tokens remain required by processing APIs. The account configuration below is historical/optional backend configuration, not a current UI requirement.
+
 A local React + PDF.js workspace backed by real FastAPI, pikepdf/qpdf, PyMuPDF/MuPDF, and optional Tesseract processing. No paid API, subscription, external document service, or fake processing.
 
 **This is a working editor with documented limits, not a complete Sejda replacement.** Short edits change actual PDF text operands. Inline edits remove the original paragraph characters and write readable vector text into the same area, with fixed-size wrapping. No whiteout hides the old text. See the [current editor guide](docs/EDITOR_GUIDE.md).

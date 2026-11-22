@@ -6,6 +6,8 @@ identity=contextvars.ContextVar('folio_user',default=None)
 _cache=OrderedDict();_lock=threading.Lock();_attempts={}
 
 def config():
+    if os.environ.get('EDIT_KARO_PUBLIC_ACCESS')=='1':
+        return {'mode':'public','signup_available':False}
     url=os.environ.get('SUPABASE_URL','').rstrip('/')
     key=os.environ.get('SUPABASE_PUBLISHABLE_KEY') or os.environ.get('SUPABASE_ANON_KEY','')
     if url and key:

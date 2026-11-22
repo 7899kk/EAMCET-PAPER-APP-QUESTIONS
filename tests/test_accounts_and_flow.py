@@ -71,3 +71,21 @@ def test_supabase_public_key_checks_and_cached_provider_verification(monkeypatch
     assert len(calls)==1
     monkeypatch.setenv('SUPABASE_PUBLISHABLE_KEY','sb_secret_not_allowed')
     with pytest.raises(ValueError,match='publishable/anon'):accounts.config()
+
+
+def test_public_access_ignores_old_login_configuration_and_edits_without_cookies(monkeypatch):
+    monkeypatch.setenv('EDIT_KARO_PUBLIC_ACCESS','1')
+    monkeypatch.setenv('FOLIO_PREVIEW_PASSWORD','old-password')
+    monkeypatch.setenv('SUPABASE_URL','invalid-unused-config')
+    monkeypatch.setenv('SUPABASE_PUBLISHABLE_KEY','unused')
+    with TestClient(app) as c:
+        status=c.get('/api/auth/status').json();assert status=={'mode':'public','signup_available':False,'user':None}
+        assert c.get('/api/health').json()['sign_in_required'] is False
+        assert c.post('/api/documents/blank').status_code==200
+        r=c.post('/api/documents',files={'file':('sample.pdf',document())});assert r.status_code==200
+        h={'X-Session':r.json()['token']}
+        b=c.get('/api/document/page/0/blocks',headers=h).json()['blocks'][0]
+        r=c.post('/api/document/inline-edit',headers=h,json={'operation':'replace-block','args':{'page':0,'id':b['id'],'original':b['text'],'text':'Edited with no sign in.'}});assert r.status_code==200,r.text
+        result=c.post('/api/document/export',headers=h,json={'kind':'pdf'});assert result.status_code==200 and not result.headers.get('www-authenticate')
+        with fitz.open(stream=result.content,filetype='pdf') as d:assert 'Edited with no sign in.' in d[0].get_text()
+        assert not c.cookies

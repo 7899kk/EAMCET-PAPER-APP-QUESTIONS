@@ -150,13 +150,14 @@ async def guards(request,call_next):
     private_ok=request.cookies.get('folio_signed_out')!='1' and (authenticated_basic or bool(password and valid_cookie(request.cookies.get(COOKIE_NAME,''),password)))
     try:cfg=accounts.config()
     except ValueError as exc:return Response(json.dumps({'detail':str(exc)}),status_code=503,media_type='application/json')
+    if cfg['mode']=='public':authenticated_basic=False;private_ok=False
     user_id='workspace' if private_ok else None
     if cfg['mode']=='supabase' and auth_header.startswith('Bearer '):
         try:
             user=await run_in_threadpool(accounts.verify,auth_header[7:]);user_id=user['id'] if user else None
         except ValueError as exc:return Response(json.dumps({'detail':str(exc)}),status_code=503,media_type='application/json')
     public=request.url.path in ('/api/health','/api/auth/status','/api/auth/login','/api/auth/logout','/api/sample.pdf') or not request.url.path.startswith('/api/')
-    if cfg['mode']!='local' and not public and not user_id:
+    if cfg['mode'] not in ('local','public') and not public and not user_id:
         return Response(json.dumps({'detail':'Please sign in to use PDF tools.'}),media_type='application/json',status_code=401,headers={'Cache-Control':'no-store'})
     if request.method in ('POST','DELETE'):
         origin=request.headers.get('origin')
@@ -195,7 +196,7 @@ async def read_file(file):
 @app.get('/api/auth/status')
 def auth_status(request:Request):
     cfg=accounts.config();password=os.environ.get('FOLIO_PREVIEW_PASSWORD','')
-    logged=bool(password and request.cookies.get('folio_signed_out')!='1' and (valid_basic(request.headers.get('authorization',''),password) or valid_cookie(request.cookies.get(COOKIE_NAME,''),password)))
+    logged=bool(cfg['mode']!='public' and password and request.cookies.get('folio_signed_out')!='1' and (valid_basic(request.headers.get('authorization',''),password) or valid_cookie(request.cookies.get(COOKIE_NAME,''),password)))
     return {**cfg,'user':{'id':'workspace','name':'Workspace member'} if logged else ({'id':accounts.identity.get(),'name':'Account member'} if accounts.identity.get() else None)}
 
 class LoginBody(BaseModel):
@@ -221,7 +222,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'text-boxes-11','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':True,'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'no-signin-12','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():

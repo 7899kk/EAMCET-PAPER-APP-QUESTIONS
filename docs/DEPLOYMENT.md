@@ -1,5 +1,7 @@
 # Deployment and actual costs
 
+Current release: sign-in has been removed from Edit karo. The Docker deployment sets `EDIT_KARO_PUBLIC_ACCESS=1`, which takes precedence over old password or Supabase settings. Visitors can upload, create blank PDFs, edit and download directly. Temporary document tokens remain required by processing APIs. The account configuration below is historical/optional backend configuration, not a current UI requirement.
+
 ## Reliable zero-budget option
 
 Run on your existing computer with `./start.sh`, then use `http://127.0.0.1:8000`. There is no API fee, paid subscription, or hosting bill. Hardware, electricity, storage, and internet still have their ordinary costs. Tesseract and all required app dependencies can be installed for free.
