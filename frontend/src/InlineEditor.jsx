@@ -8,6 +8,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
  const context=useRef(''),commits=useRef(0),analysisCommit=useRef(0),warmTicket=useRef(0);
  const styleDraft=useRef({}),savedStyle=useRef('{}'),styleTicket=useRef(0);
  const dirty=()=>draft.current!==saved.current||JSON.stringify(styleDraft.current)!==savedStyle.current;
+ const focusedSession=useRef(null);
  const pendingRefresh=useRef(false);
  const refresh=()=>{if(!pendingRefresh.current)return Promise.resolve(true);pendingRefresh.current=false;return onRefresh()};
  const current=useRef(null),draft=useRef(''),saved=useRef(''),timer=useRef(),flight=useRef(null),element=useRef(),sequence=useRef(0),click=useRef(null),finishRef=useRef(),switching=useRef(false),navigation=useRef(0),selectionIntent=useRef(null);
@@ -40,7 +41,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
    // Keep the text-free background and caret stable throughout typing. Saving
    // bytes must not wait for a second raster preview or reload the PDF canvas.
    if(current.current===a||current.current?.editSession===a.editSession){
-    const next=result.inline_block?{...a,...result.inline_block,sourceId:a.sourceId||a.id,...(JSON.stringify(styleDraft.current)!==stylesKey?{...styleDraft.current,flow_rect:styleDraft.current.rect||result.inline_block.flow_rect,max_size:styleDraft.current.size||result.inline_block.size}:{}),error:null}: {...a,id:'deleted',closing:false,error:null};current.current=next;setActive(next);
+    const next=result.inline_block?{...a,...result.inline_block,sourceId:a.sourceId||a.id,...styleDraft.current,flow_rect:styleDraft.current.rect||result.inline_block.flow_rect,max_size:styleDraft.current.size||result.inline_block.size,error:null}: {...a,id:'deleted',closing:false,error:null};current.current=next;setActive(next);
     setBlocks(previous=>previous.filter(b=>b.id!==a.id&&b.id!==a.sourceId).concat(result.inline_block?[result.inline_block]:[]));
    }
    pendingRefresh.current=true;onCommit(result);setError('');setStatus(!dirty()?'All changes saved':'Editing…');return true;
@@ -103,7 +104,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
  useLayoutEffect(()=>{if(active&&element.current){element.current.textContent=draft.current}},[active?.editSession]);
  useEffect(()=>{
   if(!active||!face||!masked||active.closing||!element.current||active.activationTicket!==navigation.current)return;
-  const el=element.current;if(document.activeElement!==el||selectionIntent.current){el.focus({preventScroll:true});placeSelection()}switching.current=false;setStatus(draft.current===saved.current?'All changes saved':'Editing…');
+  const el=element.current;if(focusedSession.current!==active.editSession||selectionIntent.current){el.focus({preventScroll:true});placeSelection();focusedSession.current=active.editSession}switching.current=false;setStatus(!dirty()?'All changes saved':'Editing…');
  },[face,masked,active?.editSession]);
  useEffect(()=>()=>clearTimeout(timer.current),[]);
  const input=()=>{
@@ -121,7 +122,7 @@ export function useInlineEditor({api,session,page,version,epoch,onCommit,onRefre
   let next={...a,...changes,...(changes.font?{font_code:changes.font}:{}),...(changes.size?{max_size:changes.size}:{}),error:null};
   if(changes.rect)next.flow_rect=changes.rect;
   current.current=next;setActive(next);setStatus('Editing…');
-  if(changes.font){try{const prepared=await resources.current.font({id:'new',creation_font:changes.font,font_key:'new:'+changes.font,ascender:a.ascender,descender:a.descender},page);if(ticket!==styleTicket.current)return;next={...current.current,...prepared,creation_font:changes.font};current.current=next;setActive(next);setFace(prepared.face)}catch(e){setError(e.message);return}}
+  if(changes.font){try{const prepared=await resources.current.font({id:'new',creation_font:changes.font,font_key:'new:'+changes.font,ascender:a.ascender,descender:a.descender},page);if(ticket!==styleTicket.current||!current.current||current.current.closing||current.current.editSession!==a.editSession)return;next={...current.current,...prepared,creation_font:changes.font};current.current=next;setActive(next);setFace(prepared.face)}catch(e){setError(e.message);return}}
   if(autosave)timer.current=setTimeout(()=>save(),350);
  };
  const duplicate=async()=>{

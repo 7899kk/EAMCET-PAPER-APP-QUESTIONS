@@ -142,3 +142,5 @@ Sign-in UI is removed. Public-mode API tests verify upload, blank PDF creation, 
 ## Direct text toolbar (release 13)
 
 check_browser_direct_text.py checks formatting without a Layers/Apply step, drag, frame resize, copy/delete, repeated placement, reselecting a saved box, and font/size/colour changes with delayed save responses. It independently reopens exports and checks content, actual fonts, point sizes and geometry. test_direct_text.py verifies combined text/style/geometry writes and rejects stale originals. The earlier text-box browser entry point forwards to this current workflow.
+
+The direct-text browser test also exports while a newly chosen font response is deliberately delayed. It verifies the PDF contains that font and that the editor remains closed after the late response. Formatting controls retain focus when fonts finish loading.

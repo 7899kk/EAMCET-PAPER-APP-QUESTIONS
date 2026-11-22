@@ -67,6 +67,17 @@ async def main():
     text=' '.join(d[0].get_text().split());assert all(x in text for x in ['First direct text box','Second direct text box','Third direct text box'])
     spans=[s for b in d[0].get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans']]
     assert any('LiberationSerif-Italic'==s['font'] and s['size']==20 for s in spans)
+   # Export before a newly chosen font has finished loading in the browser.
+   await at(50,580);await expect(field).to_be_focused(timeout=20000);await field.fill('Late font saved correctly')
+   async def slow_font(route):
+    response=await route.fetch();await asyncio.sleep(1.2);await route.fulfill(response=response)
+   await page.route('**/api/document/page/0/font?*',slow_font)
+   await page.get_by_label('Text box font',exact=True).select_option('coit')
+   async with page.expect_download() as dl:await page.get_by_role('button',name='Download PDF',exact=True).click()
+   output=OUT/f'direct-late-font-{mobile}.pdf';await(await dl.value).save_as(output)
+   await page.wait_for_timeout(1400);await expect(field).to_have_count(0)
+   with fitz.open(output) as d:
+    assert any(s['font']=='LiberationMono-Italic' for b in d[0].get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if 'Late font' in s['text'])
    assert not errors,errors
    print(json.dumps({'mobile':mobile,'direct_typing':True,'contextual_formatting':True,'drag_resize_without_mode_switch':True,'copy_delete':True,'repeat_boxes':True,'delayed_save':True,'real_fonts_and_geometry_reopened':True}),flush=True)
    await ctx.close()
