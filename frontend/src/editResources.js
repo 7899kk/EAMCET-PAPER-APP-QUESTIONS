@@ -44,5 +44,5 @@ export function createEditResources(getApi) {
   const worker=async()=>{while(index<queue.length&&!cancelled()){const b=queue[index++];try{await prepare(b,page)}catch(e){error=e.message;if(++failures>=3)index=queue.length}if(!cancelled())progress(++done,queue.length)}};
   await Promise.all([worker(),worker()]);return {failures,error};
  };
- return {prepare,warm,reset,clearPatches,pin:key=>{pinned=key||'';trim()}};
+ return {font,prepare,warm,reset,clearPatches,pin:key=>{pinned=key||'';trim()}};
 }

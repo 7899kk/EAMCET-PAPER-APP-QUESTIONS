@@ -125,3 +125,5 @@ The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. D
 `/signin` and `/signup` serve the app's account UI. The latter offers actual public registration only when Supabase is configured. Local mode without authentication variables remains usable for free on a developer's own machine.
 
 New inline text accepts a validated `font` code from the bundled 12 font/style choices. `GET /document/page/{page}/font?block=new&font=tiro` returns the matching browser font. Existing text editing keeps its original font handling.
+
+Inline edits of managed added text accept an optional box_style object (font, size, color, rect). Text and style are committed together after validating the submitted original text. New text also honors these properties on its first save. Deleting text still removes the actual object. This powers the contextual toolbar without client-only transformations.

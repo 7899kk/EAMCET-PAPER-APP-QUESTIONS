@@ -1,6 +1,6 @@
 # Verification report
 
-Release `text-boxes-11`, checked on 2026-11-22.
+Release `direct-text-13`, checked on 2026-11-22.
 
 ## Fixed-size flow checks
 
@@ -14,7 +14,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **101 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **105 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.
@@ -138,3 +138,7 @@ The same generated two-page sample was edited in Sejda and Folio on 2026-11-21: 
 ## Public access (release 12)
 
 Sign-in UI is removed. Public-mode API tests verify upload, blank PDF creation, native text editing and PDF export without cookies, even with legacy password/Supabase configuration present. The desktop/mobile text-box and image OCR browser workflow can run without signing in using `FOLIO_TEST_PUBLIC=1`. Optional private supplied-document test is skipped unless its local path is provided.
+
+## Direct text toolbar (release 13)
+
+check_browser_direct_text.py checks formatting without a Layers/Apply step, drag, frame resize, copy/delete, repeated placement, reselecting a saved box, and font/size/colour changes with delayed save responses. It independently reopens exports and checks content, actual fonts, point sizes and geometry. test_direct_text.py verifies combined text/style/geometry writes and rejects stale originals. The earlier text-box browser entry point forwards to this current workflow.

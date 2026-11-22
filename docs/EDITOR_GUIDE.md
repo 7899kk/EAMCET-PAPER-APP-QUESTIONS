@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `text-boxes-11` — Edit karo.
+Release `direct-text-13` — Edit karo.
 
 ## Click text and type
 
@@ -73,3 +73,11 @@ Add Text remains selected after placement. Click an empty area, type, then click
 Choose **Move / resize / style box** above the active box to save it and reveal its selection controls. Drag the saved box to move it, drag its corner to resize the frame, or change font and size using **Apply layer changes**. Frame resizing reflows text; font size changes enlarge or shrink the letters. Both are saved in the PDF. Select another saved box or use **Add another text box** to place more.
 
 OCR scans pages containing both native text and images; searchable mode no longer skips an entire image-containing page just because it already has a selectable heading. Mixed-page searchable conversion rasterizes the rendered appearance and supplies a recognized text layer; review recognition, since it does not retain that page's original text/font structures. Editable scan reconstruction also has the disclosed artwork/font limitations. No OCR engine can guarantee recognition of every glyph in a blurry or low-resolution image.
+
+## Direct Add Text workflow (release 13)
+
+Click Add Text, click a blank page area and type. The selected text shows a compact toolbar: font, size, bold, italic, colour, Move, Duplicate and Delete. Changes save automatically; there is no separate text-entry form or Apply step. Drag the Move grip to reposition the text; drag the corner to resize its frame. Frame resizing wraps text at its selected font size. Arrow keys on the Move grip nudge the box (Shift moves ten points).
+
+Click another empty area to place another box. Click a saved added-text box to edit it and restore its toolbar. Duplicate creates a separate saved object; Delete removes that object's PDF content. Advanced Layers controls remain available for images, brush strokes and other objects.
+
+See [the observed Sejda behavior](../research/SEJDA_ADD_TEXT_CHECK.md). This supersedes the earlier Move / resize / style and Apply instructions for Add Text.

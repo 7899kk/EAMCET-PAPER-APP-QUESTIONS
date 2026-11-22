@@ -222,7 +222,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'no-signin-12','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'direct-text-13','inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -339,11 +339,18 @@ async def inline_edit(body:OperationBody,x_session:str=Header(...)):
         with s.lock:
             ensure_idle(s)
             if args.get('id')=='new':
-                font=args.get('font','helv')
+                new_args={**args,**{k:v for k,v in args.get('box_style',{}).items() if k in ('font','size','color','rect')}}
+                font=new_args.get('font','helv')
                 if font not in layers.FONTS:raise ValueError('Choose an available font.')
                 face=fitz.Font(fontbuffer=layers.font_buffer(font))
-                result=layers.add(s.data,page,{'type':'text','text':args['text'],'rect':args['rect'],'size':args.get('size',16),'max_size':args.get('size',16),'color':args.get('color','#263449'),'font':font,'font_label':font,'ascender':face.ascender,'descender':face.descender,'fixed_frame':True,'auto_width':False})
+                result=layers.add(s.data,page,{'type':'text','text':new_args['text'],'rect':new_args['rect'],'size':new_args.get('size',16),'max_size':new_args.get('size',16),'color':new_args.get('color','#263449'),'font':font,'font_label':font,'ascender':face.ascender,'descender':face.descender,'fixed_frame':True,'auto_width':False})
                 item=layers.inspect_layers(result,page)[-1];block=blocks.managed_block(result,page,item['id'])
+            elif str(args.get('id','')).startswith('layer:') and args.get('box_style') and str(args.get('text','')).strip():
+                selected=blocks.find_block(s.data,page,args['id'])
+                if selected['text']!=args.get('original'):raise ValueError('This text box changed. Select it again.')
+                style={k:v for k,v in args['box_style'].items() if k in ('font','size','color','rect')}
+                result=layers.update(s.data,page,{'id':selected['layer_id'],'text':args['text'],**style})
+                block=blocks.managed_block(result,page,selected['layer_id'])
             elif str(args.get('id','')).startswith('layer:'):result,block=blocks.replace_block(s.data,page,args)
             else:result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))
             commit(s,result)
