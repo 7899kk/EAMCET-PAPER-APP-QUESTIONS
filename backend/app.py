@@ -222,7 +222,7 @@ def auth_logout():
     response=Response('{}',media_type='application/json');response.delete_cookie(COOKIE_NAME,path='/');response.set_cookie('folio_signed_out','1',httponly=True,samesite='strict',max_age=COOKIE_TTL,path='/');return response
 
 @app.get('/api/health')
-def health(): return {'status':'ok','word_editing':True,'editor_release':'metadata-14','edit_metadata':True,'clear_metadata':True,'inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
+def health(): return {'status':'ok','word_editing':True,'editor_release':'styled-text-15','mixed_style_editing':True,'edit_metadata':True,'clear_metadata':True,'inline_editing':True,'fixed_size_reflow':True,'layout_ocr':True,'nested_text_editing':True,'native_images':True,'editable_layers':True,'brush_highlights':True,'async_ocr':True,'editable_shapes':True,'page_previews':True,'prepared_previews':True,'continuous_pages':True,'web_sign_in':False,'sign_in_required':accounts.config()['mode'] not in ('local','public'),'engine':'pikepdf + PyMuPDF','ocr_languages':engine.ocr_languages(),'max_upload_mb':25,'max_pages':300}
 
 @app.get('/api/sample.pdf')
 def sample():
@@ -326,14 +326,17 @@ def text_blocks(page:int,x_session:str=Header(...)):
         return {'blocks':targets,'ocr_recommended':images and not any(b['editable'] for b in targets)}
 
 @app.get('/api/document/page/{page}/font')
-def block_font(page:int,block:str,x_session:str=Header(...),compatible:bool=False,font:str='helv'):
+def block_font(page:int,block:str,x_session:str=Header(...),compatible:bool=False,font:str='helv',run:str|None=None):
     s=get_session(x_session)
     with s.lock:
         if block=='new':
             if font not in layers.FONTS:raise ValueError('Choose an available font.')
             face=fitz.Font(fontbuffer=layers.font_buffer(font))
             return Response(layers.font_buffer(font),media_type='application/octet-stream',headers={'X-Font-Ascender':str(face.ascender),'X-Font-Descender':str(face.descender)})
-        selected=blocks.find_block(s.data,page,block,page_blocks(s,page));data=layers.font_buffer(blocks.compatible_font(selected['font'])) if compatible else blocks.font_for_block(s.data,page,selected)
+        selected=blocks.find_block(s.data,page,block,page_blocks(s,page))
+        style=next((r for r in selected.get('style_runs',[]) if r['font_key']==run),None) if run else selected
+        if style is None:raise ValueError('This text style changed. Select it again.')
+        data=layers.font_buffer(blocks.compatible_font(style['font'])) if compatible else blocks.font_for_block(s.data,page,selected,run)
         return Response(data,media_type='application/octet-stream')
 
 @app.post('/api/document/inline-edit')
@@ -342,7 +345,9 @@ async def inline_edit(body:OperationBody,x_session:str=Header(...)):
     def work():
         with s.lock:
             ensure_idle(s)
-            if args.get('id')=='new':
+            if body.operation=='duplicate-block':
+                result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page),duplicate=True)
+            elif args.get('id')=='new':
                 new_args={**args,**{k:v for k,v in args.get('box_style',{}).items() if k in ('font','size','color','rect')}}
                 font=new_args.get('font','helv')
                 if font not in layers.FONTS:raise ValueError('Choose an available font.')
@@ -356,7 +361,14 @@ async def inline_edit(body:OperationBody,x_session:str=Header(...)):
                 result=layers.update(s.data,page,{'id':selected['layer_id'],'text':args['text'],**style})
                 block=blocks.managed_block(result,page,selected['layer_id'])
             elif str(args.get('id','')).startswith('layer:'):result,block=blocks.replace_block(s.data,page,args)
-            else:result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))
+            else:
+                result,block=blocks.replace_block(s.data,page,args,page_blocks(s,page),page_words(s,page))
+                # The first save converts native text into a managed object.
+                # Apply simultaneous formatting in that same transaction too.
+                if block and args.get('box_style'):
+                    style={k:v for k,v in args['box_style'].items() if k in ('font','size','color','rect')}
+                    result=layers.update(result,page,{'id':block['layer_id'],**style})
+                    block=blocks.managed_block(result,page,block['layer_id'])
             commit(s,result)
             return {**describe(s),'inline_block':block}
     return await run_in_threadpool(work)

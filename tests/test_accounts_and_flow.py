@@ -38,17 +38,22 @@ def test_account_owned_documents_cannot_be_accessed_by_another_signed_in_user(mo
         assert c.get('/api/document/pdf',headers={**a,**token}).status_code==200
         assert 'https://example.supabase.co' in c.get('/').headers['content-security-policy']
 
-def test_mixed_font_line_is_one_editable_line_and_longer_text_wraps():
+def test_mixed_font_line_preserves_styles_while_longer_text_wraps():
     with fitz.open() as d:
         p=d.new_page();x=45
         for text,font in [("I'm feeling ",'helv'),('happy','hebo'),(' Today','helv')]:
             p.insert_text((x,90),text,fontname=font,fontsize=18);x+=fitz.get_text_length(text,fontname=font,fontsize=18)
         source=d.tobytes()
-    b=blocks.inspect_blocks(source,0)[0];assert b['text']=="I'm feeling happy Today" and b['editable'] and b['font_notice']
+    detected=blocks.inspect_blocks(source,0)
+    assert detected[0]['text']=="I'm feeling happy Today" and detected[0]['style_runs']
+    b=detected[0];assert b['editable'] and all(x['editable'] for x in detected)
     text="I'm feeling enthusiastic and happy Today. This longer sentence should wrap naturally onto another line."
     changed,u=blocks.replace_block(source,0,{'id':b['id'],'original':b['text'],'text':text})
     assert u['size']==18 and u['rect'][3]>b['rect'][3]
-    with fitz.open(stream=changed,filetype='pdf') as d:assert text in ' '.join(d[0].get_text().split())
+    with fitz.open(stream=changed,filetype='pdf') as d:
+        assert text in ' '.join(d[0].get_text().split())
+        happy=next(s for b in d[0].get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text']=='happy')
+        assert happy['font']=='LiberationSans-Bold' and happy['size']==18
 
 def test_legacy_narrow_managed_text_widens_instead_of_becoming_a_column():
     data=document();data=layers.add(data,0,{'type':'text','font':'helv','text':'Ashok','rect':[45,160,95,190],'size':16,'max_size':16,'fixed_frame':True})

@@ -106,3 +106,8 @@
 .text-box-corner{width:22px;height:22px;transform:translate(-3px,-3px)}
 
 .metadata-advanced{padding:12px 0;border-top:1px solid #e0e7da}.metadata-advanced summary{cursor:pointer;color:#40644c;font-size:12px;margin-bottom:12px}.metadata-custom-row{display:flex;gap:8px;align-items:center}.metadata-custom-row .field{flex:1;min-width:0}.metadata-custom-row .icon-btn{flex-shrink:0}
+
+/* Keep text controls accessible without covering another paragraph. */
+.text-format-dock{flex-shrink:0;padding:5px 8px;background:#f7faf4;border-bottom:1px solid var(--line);position:relative;z-index:31}
+.text-format-dock:empty{display:none}
+.text-format-dock .text-format-toolbar{position:static;max-width:600px;width:100%;margin:0 auto;box-shadow:none}

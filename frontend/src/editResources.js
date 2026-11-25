@@ -12,7 +12,7 @@ export function createEditResources(getApi) {
   entry.promise=(async()=>{
    let compatible=!!b.font_fallback;
    for(let attempt=0;attempt<2;attempt++){
-    const r=await getApi()(`/document/page/${page}/font?block=${encodeURIComponent(b.id)}${compatible?'&compatible=true':''}${b.id==='new'?'&font='+encodeURIComponent(b.creation_font||'helv'):''}`,{timeoutMs:20000});
+    const r=await getApi()(`/document/page/${page}/font?block=${encodeURIComponent(b.id)}${b.style_run?'&run='+encodeURIComponent(b.style_run):''}${compatible?'&compatible=true':''}${b.id==='new'?'&font='+encodeURIComponent(b.creation_font||'helv'):''}`,{timeoutMs:20000});
     const buffer=await r.arrayBuffer(),asc=Number(r.headers.get('X-Font-Ascender'))||b.ascender,desc=Number(r.headers.get('X-Font-Descender'))||b.descender;
     try{
      const face=new FontFace('folio-prepared-'+(++serial),buffer,{ascentOverride:`${asc*100}%`,descentOverride:`${Math.abs(desc)*100}%`,lineGapOverride:'0%'});await face.load();
@@ -36,7 +36,10 @@ export function createEditResources(getApi) {
    entry.result={url,rect,key};entry.bytes=blob.size;bytes+=blob.size;trim();return entry.result;
   })().catch(e=>{if(patches.get(key)===entry)patches.delete(key);throw e});patches.set(key,entry);return entry.promise;
  };
- const prepare=async(b,page)=>{const [f,p]=await Promise.all([font(b,page),b.id==='new'?Promise.resolve(null):patch(b,page)]);return {...f,patch:p}};
+ const prepare=async(b,page)=>{
+  const [f,p,styles]=await Promise.all([font(b,page),b.id==='new'?Promise.resolve(null):patch(b,page),Promise.all((b.style_runs||[]).map(async run=>({key:run.font_key,...await font({...b,...run,ascender:b.ascender,descender:b.descender,style_run:run.font_key},page)})))]);
+  return {...f,patch:p,style_faces:Object.fromEntries(styles.map(s=>[s.key,s.face])),fallback_styles:styles.filter(s=>s.font_fallback).map(s=>s.key)};
+ };
  const warm=async(blocks,page,progress,cancelled)=>{
   // Bound speculative native parsing/rasterization. Other paragraphs prepare on
   // demand rather than competing with typing and autosaves on a small server.

@@ -203,6 +203,7 @@ def _word_map(data, page_index):
                     identity = ';'.join(f"{part['id']}:{part['start']}:{part['end']}" for part in parts)
                     words.append({'id': identity if editable else 'readonly-' + str(len(words)),
                                   'text': match.group(), 'bbox': list(bounds), 'size': first['size'] * first['yscale'] if editable else style['size'],
+                                  'font_resource': first['font'] if editable else None,
                                   'font': style['font'], 'color': f"#{style['color']:06x}",
                                   'editable': editable, 'parts': parts if editable else [],
                                   'reason': None if editable else 'This word uses an unsupported font or complex script, a reused object, overlapping glyphs, mixed styles, or transformed text. Its original content cannot be safely replaced here.'})

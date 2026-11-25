@@ -1,6 +1,6 @@
 # Direct PDF editing
 
-Release `metadata-14` — Edit karo.
+Release `styled-text-15` — Edit karo.
 
 ## Click text and type
 
@@ -50,7 +50,7 @@ Clicking another paragraph now waits for its predecessor's pending save, resolve
 
 ## Natural wrapping and continuous pages
 
-Text fields have no internal vertical scrollbar. Longer text wraps and expands visibly. Mixed-font segments at the same point size are combined into a line, with a notice that reflow uses its main font. Legacy narrow inline layers can widen into available space. Explicitly resized layers retain their chosen width. Nearby unrelated content and page boundaries still limit safe saving; a draft that cannot fit is retained with an error, rather than silently overlapping content.
+Text fields have no internal vertical scrollbar. Longer text wraps and expands visibly. Mixed-font segments at the same point size keep their individual fonts and colours within the paragraph. Replacing an amount inherits that amount’s original face, including embedded extra-bold and semibold variants. Words still wrap at the original point size. Choosing a different font or colour in the toolbar deliberately applies it to the whole text box. Legacy narrow inline layers can widen into available space. Explicitly resized layers retain their chosen width. Nearby unrelated content and page boundaries still limit safe saving; a draft that cannot fit is retained with an error, rather than silently overlapping content.
 
 Scroll through the continuous page stack to see the next page automatically. Distant pages use lazy image previews; the active visible page loads the actual PDF and editable text. Pending edits are saved before activating another page. Download shows an indeterminate preparation animation, then starts the real file download and retains Save/Open links.
 
@@ -89,3 +89,9 @@ Use **Edit Metadata** in the workspace header or All tools. Title, Author, Subje
 **Clear Metadata** is a separate All tools action and is available in the editor. It removes standard/custom document properties and XMP, with Undo in the session. It preserves pages, comments (including authors) and editing layers. This does not redact visible text or anonymize every other kind of document content.
 
 See [the actual Sejda comparison](../research/SEJDA_METADATA_CHECK.md).
+
+## Styled numeric editing and controls
+
+Click the text, select the number and type its replacement. Supported embedded font bytes are reused for each style run, rather than flattening the line to its longest span’s font. Original fonts that cannot be decoded, non-embedded standard fonts and missing subset characters use a disclosed compatible font; exact original weight is not promised in those cases. OCR cannot recover the exact original font from an image. Complex scripts, outlines and synthetic stroke effects remain limited.
+
+The formatting toolbar sits above the canvas so it does not block nearby paragraphs on phones. It is available for both existing and added text. Original single-font bold/italic states are reflected in its controls. Formatting applies to the whole text box. Copy preserves the text object’s embedded fonts and mixed styles; copy actions finish before Delete, editing or download proceeds. Font, size, colour and frame changes on a native paragraph are honored on its first save.

@@ -80,3 +80,7 @@ The six unmodified Liberation Sans/Serif/Mono Italic and BoldItalic TTFs are inc
 ## Optional public account client
 
 `@supabase/supabase-js` 2.119.2 and its auth/functions/postgrest/realtime/storage SDK dependencies, `@supabase/phoenix` 0.4.5 and `iceberg-js` 0.8.1 are MIT-licensed. `tslib` 2.8.1 is 0BSD. Installed package licences were checked, and their exact notices are retained under `THIRD_PARTY/accounts/`. The dependency versions are pinned in the frontend lockfile. Supabase is used only for accounts; documents are not sent there. A free project is sufficient within its current account/email/usage limits, which remain the provider's limits rather than an unlimited-service promise.
+
+### Additional numeric-style test fixtures
+
+The optional local tests read Open Sans ExtraBold and SemiboldItalic from the installed `fonts-open-sans` package. Its installed copyright identifies these distro files as Apache-2.0 (Google, 2010–2011); the notice is retained under `THIRD_PARTY/system/fonts-open-sans/copyright`. These fonts are not added as application assets or required runtime dependencies. Tests skip these two fixtures when unavailable. No new processing library was introduced.

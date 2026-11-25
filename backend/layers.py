@@ -9,6 +9,7 @@ from pathlib import Path
 import pikepdf
 import pymupdf as fitz
 from PIL import Image
+from . import richtext
 
 FONTS={'helv','hebo','heit','hebi','tiro','tibo','tiit','tibi','cour','cobo','coit','cobi'}
 FONT_FILES={'helv':'LiberationSans-Regular.ttf','hebo':'LiberationSans-Bold.ttf','tiro':'LiberationSerif-Regular.ttf','tibo':'LiberationSerif-Bold.ttf','cour':'LiberationMono-Regular.ttf','cobo':'LiberationMono-Bold.ttf','heit':'LiberationSans-Italic.ttf','hebi':'LiberationSans-BoldItalic.ttf','tiit':'LiberationSerif-Italic.ttf','tibi':'LiberationSerif-BoldItalic.ttf','coit':'LiberationMono-Italic.ttf','cobi':'LiberationMono-BoldItalic.ttf'}
@@ -57,7 +58,7 @@ def text_style(args,font_bytes=None):
     if not math.isfinite(size) or not 4<=size<=144:raise ValueError('Font size must be 4–144 pt.')
     face=fitz.Font(fontbuffer=font_bytes or font_buffer(font))
     missing=next((c for c in text if not c.isspace() and not face.has_glyph(ord(c))),None)
-    if missing:raise ValueError(f'The chosen font lacks {missing!r}. Remove that character or choose another font under Layers.')
+    if missing and not args.get('style_runs'):raise ValueError(f'The chosen font lacks {missing!r}. Remove that character or choose another font under Layers.')
     return text.replace('\t','    '),font,size,rgb(args.get('color','#263449'))
 
 def text_height(text,width,size,font,font_bytes=None,lineheight=1.2):
@@ -150,7 +151,7 @@ def remove(data,page_index,identity):
         objects=pikepdf.Dictionary(page.Resources.XObject);del objects[name];page.Resources.XObject=objects
         return _save(pdf)
 
-def add(data,page_index,args,extra=None,font_bytes=None):
+def add(data,page_index,args,extra=None,font_bytes=None,style_fonts=None):
     kind=args.get('type','text');meta={'schema':1,'id':args.get('id') or uuid.uuid4().hex,'type':kind}
     with fitz.open(stream=data,filetype='pdf') as doc,fitz.open() as source:
         if not 0<=page_index<len(doc):raise ValueError('Invalid page.')
@@ -165,13 +166,24 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                 if width<20:raise ValueError('Click further from the right edge to leave room for text.')
                 height=text_height(text,width,size,font)
                 rect=checked_rect(page,[x,y,x+width,y+height])
-            height=text_height(text,rect.width,size,font,font_bytes,lineheight)
+            # Fixed frames use the glyph-aware layout below; building a second
+            # scratch PDF here did redundant font embedding on every autosave.
+            height=None if args.get('fixed_frame') else text_height(text,rect.width,size,font,font_bytes,lineheight)
             if args.get('fixed_frame'):
                 # Keep the chosen font size. Grow down and wrap; never auto-shrink.
                 size=float(args.get('max_size',size))
                 if not math.isfinite(size) or not 4<=size<=144:raise ValueError('Font size must be 4–144 pt.')
                 face=fitz.Font(fontbuffer=font_bytes or font_buffer(font));asc=float(args.get('ascender',face.ascender));desc=float(args.get('descender',face.descender))
-                needed=(asc-desc)*size+max(0,len(frame_lines(text,rect.width,size,face))-1)*lineheight*size
+                styled=args.get('style_runs')
+                if styled:
+                    faces={key:fitz.Font(fontbuffer=raw) for key,raw in (style_fonts or {}).items()}
+                    if ''.join(r['text'] for r in styled)!=text:raise ValueError('The text styles no longer match this paragraph.')
+                    for run in styled:
+                        if run['font_key'] not in faces:raise ValueError('A paragraph font is missing. Select the text again.')
+                        if any(not c.isspace() and not faces[run['font_key']].has_glyph(ord(c)) for c in run['text']):raise ValueError('A text style lacks a requested character. Choose a full font.')
+                    lines=richtext.layout(styled,rect.width,size,faces)
+                else:lines=frame_lines(text,rect.width,size,face)
+                needed=(asc-desc)*size+max(0,len(lines)-1)*lineheight*size
                 available=flow_rect(page,rect)
                 minimum=float(args.get('min_height',rect.height))
                 target=max(minimum,needed)
@@ -183,9 +195,20 @@ def add(data,page_index,args,extra=None,font_bytes=None):
                 rect=checked_rect(page,[rect.x0,rect.y0,rect.x1,rect.y0+height])
             p=source.new_page(width=rect.width,height=rect.height)
             if args.get('fixed_frame'):
-                xref=p.insert_font(fontname='FolioText',fontbuffer=font_bytes or font_buffer(font));normalize_space_map(p.parent,xref)
-                for i,line in enumerate(frame_lines(text,rect.width,size,face)):
-                    if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
+                if styled:
+                    names={key:'FolioStyle'+str(i) for i,key in enumerate(style_fonts)}
+                    for key,name in names.items():
+                        xref=p.insert_font(fontname=name,fontbuffer=style_fonts[key]);normalize_space_map(p.parent,xref)
+                    for i,line in enumerate(lines):
+                        x=0
+                        for piece in richtext.merge([{k:v for k,v in part.items() if k!='width'} for part in line]):
+                            p.insert_text((x,(asc+i*lineheight)*size),piece['text'],fontname=names[piece['font_key']],fontsize=size,color=rgb(piece['color']))
+                            x+=faces[piece['font_key']].text_length(piece['text'],fontsize=size)
+                    meta['style_runs']=[{k:v for k,v in run.items() if k in ('text','font','font_key','color')} for run in styled]
+                else:
+                    xref=p.insert_font(fontname='FolioText',fontbuffer=font_bytes or font_buffer(font));normalize_space_map(p.parent,xref)
+                    for i,line in enumerate(lines):
+                        if line:p.insert_text((0,(asc+i*lineheight)*size),line,fontname='FolioText',fontsize=size,color=color)
             elif draw_text(p,p.rect,text,font,size,color,font_bytes,lineheight)<-.01:raise ValueError('The text needs a larger box; no changes were saved.')
             meta.update({'text':text,'font':font,'size':size,'color':args.get('color','#263449'),'font_key':hashlib.sha256(font_bytes or font_buffer(font)).hexdigest()[:20]})
             for key in ('fixed_frame','max_size','lineheight','font_label','ascender','descender','min_height','font_notice','auto_width','manual_width'):
@@ -219,6 +242,9 @@ def add(data,page_index,args,extra=None,font_bytes=None):
         if font_bytes:
             if len(font_bytes)>5*1024*1024:raise ValueError('Embedded font exceeds the supported size.')
             pdf.pages[page_index].Resources.XObject['/'+name].FolioFont=pdf.make_stream(font_bytes)
+        if style_fonts:
+            if sum(map(len,style_fonts.values()))>12*1024*1024:raise ValueError('Paragraph fonts exceed the supported size.')
+            pdf.pages[page_index].Resources.XObject['/'+name].FolioFonts=pikepdf.Dictionary({ '/'+key:pdf.make_stream(raw) for key,raw in style_fonts.items()})
         return _save(pdf)
 
 def font_for_layer(data,page_index,identity):
@@ -228,6 +254,12 @@ def font_for_layer(data,page_index,identity):
         _,obj,meta=item
         return obj.FolioFont.read_bytes() if '/FolioFont' in obj else font_buffer(meta['font'])
 
+def fonts_for_layer(data,page_index,identity):
+    with pikepdf.open(io.BytesIO(data)) as pdf:
+        item=next((o for o in _objects(pdf,page_index) if o[2]['id']==identity),None)
+        if not item:raise ValueError('This text layer no longer exists.')
+        return {str(key).lstrip('/'):raw.read_bytes() for key,raw in item[1].get('/FolioFonts',{}).items()}
+
 def update(data,page_index,args):
     old=next((m for m in inspect_layers(data,page_index) if m['id']==args.get('id')),None)
     if not old:raise ValueError('This layer no longer exists. Select it again.')
@@ -236,6 +268,13 @@ def update(data,page_index,args):
         face=fitz.Font(fontbuffer=font_buffer(merged['font']))
         merged.update(font_label={'helv':'Sans','hebo':'Sans Bold','tiro':'Serif','tibo':'Serif Bold','cour':'Monospace','cobo':'Monospace Bold','heit':'Sans Italic','hebi':'Sans Bold Italic','tiit':'Serif Italic','tibi':'Serif Bold Italic','coit':'Monospace Italic','cobi':'Monospace Bold Italic'}[merged['font']],ascender=face.ascender,descender=face.descender)
     font_bytes=font_for_layer(data,page_index,old['id']) if old.get('font')=='source' and merged.get('font')=='source' else None
+    style_fonts=fonts_for_layer(data,page_index,old['id']) if old.get('style_runs') else None
+    if old.get('style_runs'):
+        if merged['font']!=old['font']:
+            merged.pop('style_runs',None);style_fonts=None
+        else:
+            merged['style_runs']=richtext.retarget(old['style_runs'],merged['text'])
+            if 'color' in args:merged['style_runs']=[{**r,'color':args['color']} for r in merged['style_runs']]
     if 'size' in args and old.get('fixed_frame'):merged['max_size']=args['size']
     if old.get('fixed_frame') and 'rect' in args and fitz.Rect(args['rect']).height!=fitz.Rect(old['rect']).height:merged['min_height']=fitz.Rect(args['rect']).height
     if old.get('fixed_frame') and 'rect' in args and abs(fitz.Rect(args['rect']).width-fitz.Rect(old['rect']).width)>.1:merged['manual_width']=True
@@ -269,4 +308,4 @@ def update(data,page_index,args):
         merged['width']=max(.5,min(60,old['width']*min(b.width/a.width,b.height/a.height)))
     elif old['type']=='brush' and merged['width']!=old['width']:
         merged.pop('rect',None)
-    return add(remove(data,page_index,old['id']),page_index,merged,font_bytes=font_bytes)
+    return add(remove(data,page_index,old['id']),page_index,merged,font_bytes=font_bytes,style_fonts=style_fonts)

@@ -1,6 +1,18 @@
 # Verification report
 
-Release `metadata-14`, checked on 2026-11-22.
+Release `styled-text-15`, checked on 2026-11-25.
+
+## Styled numeric editing regression
+
+`tests/test_numeric_styles.py` verifies numeric editing in mixed-font lines for all 12 bundled faces and optional embedded Open Sans ExtraBold/SemiboldItalic. It compares the actual reused font bytes, extracted font names, size, colour and unchanged neighbouring label pixels. Same-named subset fonts are resolved by their actual PDF resource. Amount edits survive repeated saves/reopen, wrapping with a regular-text suffix, compression, metadata edit/clear, rotation, copy, move/resize and deletion. First-save formatting is applied atomically; invalid formatting leaves the original document/history intact. The previous mixed-font test now verifies preserved bold styling during paragraph reflow instead of accepting flattening.
+
+`scripts/check_browser_numeric_styles.py` covers real word-range selection and replacement, original bold controls, copy/delete sequencing, first native formatting without a text change, download/reupload and repeated numeric editing. It also inserts a new line while a previous save is delayed; both lines must appear in the independently reopened PDF with their original styles. The formatting controls are docked above the canvas so they cannot intercept clicks on neighbouring paragraphs on mobile.
+
+The current desktop/mobile regression set also includes `check_browser_direct_text.py`, `check_browser_reflow.py`, `check_browser_inline.py` with the private supplied guide, `check_browser_save_stability.py` and `check_browser_metadata.py`. Outputs are independently reopened with MuPDF and/or Poppler, and browser JavaScript errors are checked. Private documents remain local and are excluded from the repository/source archive.
+
+## Measured page-analysis work
+
+`scripts/benchmark_numeric_editing.py` runs a generated 28-line embedded-bold PDF through 15 iterations, reporting the median after two warmups. On the same local machine, baseline commit `30f29fdb2ddc5454b9993aad041aa66bccbc7d4f` took **126.34 ms** for analysis; this change took **110.67 ms** (about **12% lower**). Save medians were 78.25 ms and 77.60 ms, essentially unchanged. These are local CPU measurements, not hosting/network latency or a promise that every operation is faster. Page analysis reuses word-resource results instead of reparsing the entire content stream. Fixed-frame autosave also avoids a redundant temporary-PDF font-layout pass. OCR still depends on document size, language and server CPU; Render's free service can still cold-start.
 
 ## Fixed-size flow checks
 
@@ -14,7 +26,7 @@ The canonical current browser suite is `scripts/check_browser_inline.py`. It pas
 
 ## Engine checks and previous-release browser history
 
-- **114 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
+- **133 Python tests passed with the optional provided-document check** against the real PDF engine and FastAPI API. The production React/Vite build passed.
 - Generated fixtures cover selectable text, scanned pages, embedded images, multiple pages, standard and embedded fonts, formatting, repeated words, fragmented words, kerning, spacing and unsupported structures.
 - Existing-word edits survive later additions, compression and metadata updates. MuPDF and independent Poppler text extraction reopen exported PDFs. Tests assert the old text is absent and no replacement cover rectangles were introduced.
 - Rectangle, ellipse, line and arrow are actual PDF annotations. Tests cover geometry, border/fill/width, moving, resizing, deletion, undo/redo, export, stable identity across content rewrites, invalid input and horizontal lines. Independent Poppler rendering checks that the saved annotation appearance is visible.

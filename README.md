@@ -1,6 +1,6 @@
 # Edit karo PDF editor
 
-Current release: sign-in has been removed from Edit karo. The Docker deployment sets `EDIT_KARO_PUBLIC_ACCESS=1`, which takes precedence over old password or Supabase settings. Visitors can upload, create blank PDFs, edit and download directly. Temporary document tokens remain required by processing APIs. The account configuration below is historical/optional backend configuration, not a current UI requirement.
+Current release: `styled-text-15`. Mixed-style numeric edits retain supported embedded fonts, weights, size and colour. Sign-in has been removed from Edit karo. The Docker deployment sets `EDIT_KARO_PUBLIC_ACCESS=1`, which takes precedence over old password or Supabase settings. Visitors can upload, create blank PDFs, edit and download directly. Temporary document tokens remain required by processing APIs. The account configuration below is historical/optional backend configuration, not a current UI requirement.
 
 A local React + PDF.js workspace backed by real FastAPI, pikepdf/qpdf, PyMuPDF/MuPDF, and optional Tesseract processing. No paid API, subscription, external document service, or fake processing.
 
@@ -91,11 +91,11 @@ Download recovery: after **Download PDF** prepares the real edited file, persist
 
 The landing page is public. Opening a PDF tool asks for sign-in when hosted authentication is enabled. The private form uses username `folio` and your existing password, with an optional 30-day remembered session. Public email/password registration uses Supabase Auth and requires your own free project URL and publishable key; it remains unavailable until configured. See [account setup](docs/ACCOUNTS.md) for environment variables, confirmation settings, and signup fields.
 
-Scroll through pages continuously; adjacent page previews load lazily and the visible page becomes editable. Inline text grows without an internal scrollbar, and mixed-font lines are grouped at the same point size. Editing a mixed-style line uses its main font. Export shows progress and retains fallback download links. Safe document boundaries still apply; the app does not reflow unrelated paragraphs or pages.
+Scroll through pages continuously; adjacent page previews load lazily and the visible page becomes editable. Inline text grows without an internal scrollbar, and mixed-font lines are grouped at the same point size. Supported mixed-font paragraphs retain their individual font/style runs while typing and wrapping; numeric amounts keep their own bold/italic face and colour. Export shows progress and retains fallback download links. Safe document boundaries still apply; the app does not reflow unrelated paragraphs or pages.
 
 Release 10 keeps autosave independent of canvas refresh, groups editable OCR words into lines, provides a visible Add Text prompt, and automatically fits new documents to the workspace. Searchable OCR keeps scan pixels; choose an editable OCR output to change recognized text. See [the editing guide](docs/EDITOR_GUIDE.md).
 
 Start from the normal PDF uploader or the small **Start with a blank PDF** link (one A4 page). Add Text stays active for multiple independent boxes. Choose among 12 bundled Sans, Serif and Monospace faces/styles; use Move / resize / style box to select the saved object, drag it, resize its corner, change its font/size, or delete it. PDF images can be inserted into a blank document and recognized with editable OCR.
-Add Text now has a contextual toolbar beside the active text for font, size, bold, italic, colour, moving, duplicating and deleting. Drag its Move grip or corner directly; changes autosave without a separate Layers/Apply step. See research/SEJDA_ADD_TEXT_CHECK.md for the actual comparison.
+Existing text and Add Text have a contextual toolbar above the canvas for font, size, bold, italic, colour, moving, duplicating and deleting. Drag its Move grip or corner directly; changes autosave without a separate Layers/Apply step. See research/SEJDA_ADD_TEXT_CHECK.md for the actual comparison.
 
 **Edit Metadata** and **Clear Metadata** are in All tools, with Edit Metadata also in the header. Standard properties, dates and custom properties are editable; standard fields synchronize with XMP. Clearing removes Info/XMP while preserving pages, comments and editing layers. See the metadata guide and same-PDF Sejda comparison.

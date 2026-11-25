@@ -102,7 +102,7 @@ Error JSON uses `detail`. Common codes: 422 invalid/unsupported operation or fil
 - `GET /document/page/{page}/pdf?exclude_block=ID`: temporary preview without the selected source paragraph, for live DOM typing without doubled glyphs. Does not commit changes.
 - `POST /document/inline-edit`: `{ "operation":"replace-block", "args":{"page":0,"id":"ID","original":"current text","text":"replacement"} }`. Validates the current source under the session lock, removes original source characters and inserts vector text with the original embedded font in the same frame. Returns document info and `inline_block`. New text uses `id:"new"` and a `rect`.
 
-Text keeps its font size and wraps within the server-computed `flow_rect`. Single lines can widen into available horizontal space; multiline paragraphs keep their width. Saved layers grow vertically as needed and can shorten again. Overflow and stale-source errors leave the saved PDF unchanged. Legacy auto-fit layers restore their saved original maximum size on direct edit. Font size changes require an explicit Layers operation. Font/structure limitations are returned explicitly. Autosave is a frontend behavior; this endpoint commits actual PDF bytes. Full-page reflow is unsupported.
+Text keeps its font size and wraps within the server-computed `flow_rect`. Single lines can widen into available horizontal space; multiline paragraphs keep their width. Saved layers grow vertically as needed and can shorten again. Overflow and stale-source errors leave the saved PDF unchanged. Legacy auto-fit layers restore their saved original maximum size on direct edit. Font size changes require an explicit toolbar or Layers operation. Font/structure limitations are returned explicitly. Autosave is a frontend behavior; this endpoint commits actual PDF bytes. Full-page reflow is unsupported.
 
 Layers also return supported direct native raster image occurrences with `image:` IDs. `layer-delete` removes that occurrence. `layer-update` moves/resizes it by converting to a managed rectangular layer; original clipping is not preserved. Other uses of the same image resource remain unchanged.
 
@@ -126,10 +126,18 @@ The blocks response includes `font_notice`, `font_key`, and `ocr_recommended`. D
 
 New inline text accepts a validated `font` code from the bundled 12 font/style choices. `GET /document/page/{page}/font?block=new&font=tiro` returns the matching browser font. Existing text editing keeps its original font handling.
 
-Inline edits of managed added text accept an optional box_style object (font, size, color, rect). Text and style are committed together after validating the submitted original text. New text also honors these properties on its first save. Deleting text still removes the actual object. This powers the contextual toolbar without client-only transformations.
+Inline edits of native and managed text accept an optional box_style object (font, size, color, rect). Text and style are committed together after validating the submitted original text. New text also honors these properties on its first save. Deleting text still removes the actual object. This powers the contextual toolbar without client-only transformations.
 
 ## Document metadata
 
 GET /document/metadata returns standard fields (including XMP-only properties), custom string properties and an XMP-packet count. POST /document/operation with operation metadata accepts args.metadata (title, author, subject, keywords, creator, producer, creationDate, modDate) and optional args.custom. Standard edits synchronize Info and XMP. Dates accept ISO 8601 or PDF dates; timezone-free new dates use UTC. Empty standard values remove entries. Values are limited to 2000 characters and custom properties to 50.
 
 Operation clear-metadata removes Info and document/page/object Metadata associations, rewriting the PDF without incremental metadata history. Pages, comments and editable objects remain. Both operations use the existing session, Undo/Redo and export APIs.
+
+### Mixed-style text and copying
+
+`blocks` and `inline_block` can include `style_runs`: ordered objects with `text`, `font`, `color` and a `font_key`. Source-only descriptors are not stable after an edit; use the returned current block. `GET /document/page/{page}/font?block=ID&run=FONT_KEY` returns the session’s corresponding style font; `compatible=true` selects its disclosed fallback. The browser sends `fallback_styles` with keys whose font decoding required fallback. These are not arbitrary font URLs.
+
+`replace-block` preserves unchanged styles and makes replacement characters inherit the local source style. Mixed runs wrap together using actual glyph widths and one shared baseline; point size is fixed. The saved vector object retains its style runs and embedded font streams across export/reupload, resize, copy, compression and metadata operations. Explicit `box_style.font` or `box_style.color` applies to the entire box. Native first saves apply `box_style` in the same validated transaction.
+
+`POST /document/inline-edit` also accepts `operation: "duplicate-block"` with `args: {page, id, original, text, rect}`. It validates the current original, creates an independent styled object at the supplied frame, and returns its `inline_block`. It does not remove the source object. Validation failures preserve both the saved document and history.
